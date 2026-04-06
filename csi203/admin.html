@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PacketDukjub - Admin Console</title>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #111827;
+            --bg-card: #1a2035;
+            --bg-card-hover: #1f2845;
+            --border-color: #2a3352;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, .25);
+            --accent2: #22d3ee;
+            --danger: #ef4444;
+            --success: #10b981;
+            --warn: #f59e0b;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+        }
+
+        /* Navbar */
+        .admin-nav {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+
+        .admin-nav .brand {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .admin-nav .brand span {
+            color: var(--accent);
+        }
+
+        .admin-nav .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .admin-nav .badge-admin {
+            background: linear-gradient(135deg, var(--accent), #818cf8);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: .5px;
+        }
+
+        /* Tabs */
+        .tab-bar {
+            display: flex;
+            gap: 4px;
+            padding: 16px 24px 0;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all .2s;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-primary);
+            background: rgba(99, 102, 241, .08);
+        }
+
+        .tab-btn.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+            background: rgba(99, 102, 241, .1);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px 24px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Cards */
+        .card-dark {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            transition: border-color .2s;
+        }
+
+        .card-dark:hover {
+            border-color: var(--accent);
+        }
+
+        .card-dark h6 {
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .card-dark .value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        /* Stat row */
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .stat-glow-indigo .value {
+            color: var(--accent);
+            text-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .stat-glow-cyan .value {
+            color: var(--accent2);
+            text-shadow: 0 0 20px rgba(34, 211, 238, .25);
+        }
+
+        .stat-glow-green .value {
+            color: var(--success);
+            text-shadow: 0 0 20px rgba(16, 185, 129, .25);
+        }
+
+        .stat-glow-warn .value {
+            color: var(--warn);
+            text-shadow: 0 0 20px rgba(245, 158, 11, .25);
+        }
+
+        .stat-glow-red .value {
+            color: var(--danger);
+            text-shadow: 0 0 20px rgba(239, 68, 68, .25);
+        }
+
+        /* Table */
+        .table-dark-custom {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .table-dark-custom th {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            font-size: 10px;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .table-dark-custom td {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(42, 51, 82, .5);
+            vertical-align: middle;
+        }
+
+        .table-dark-custom tr:hover {
+            background: var(--bg-card-hover);
+            cursor: pointer;
+        }
+
+        .table-scroll {
+            max-height: 500px;
+            overflow-y: auto;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Badges */
+        .badge-proto {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .badge-enc {
+            background: rgba(16, 185, 129, .15);
+            color: #34d399;
+        }
+
+        .badge-plain {
+            background: rgba(239, 68, 68, .15);
+            color: #f87171;
+        }
+
+        .badge-tcp {
+            background: rgba(99, 102, 241, .15);
+            color: #a5b4fc;
+        }
+
+        .badge-udp {
+            background: rgba(245, 158, 11, .15);
+            color: #fbbf24;
+        }
+
+        .badge-dns {
+            background: rgba(34, 211, 238, .15);
+            color: #67e8f9;
+        }
+
+        .badge-https {
+            background: rgba(16, 185, 129, .15);
+            color: #6ee7b7;
+        }
+
+        .badge-quic {
+            background: rgba(168, 85, 247, .15);
+            color: #c084fc;
+        }
+
+        .badge-http {
+            background: rgba(251, 146, 60, .15);
+            color: #fdba74;
+        }
+
+        /* Controls */
+        .ctrl-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .ctrl-bar select,
+        .ctrl-bar input {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            outline: none;
+            transition: border-color .2s;
+        }
+
+        .ctrl-bar select:focus,
+        .ctrl-bar input:focus {
+            border-color: var(--accent);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, var(--accent), #818cf8);
+            color: #fff;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            transition: transform .15s, box-shadow .15s;
+        }
+
+        .btn-accent:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* User table */
+        .user-role-select {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        /* Online dot */
+        .dot-online {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 6px var(--success);
+            margin-right: 6px;
+        }
+
+        .dot-offline {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-secondary);
+            margin-right: 6px;
+        }
+
+        /* Online users panel */
+        .online-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+
+        .online-panel h6 {
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+
+        .online-user-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 13px;
+        }
+
+        .online-user-item .badge-role {
+            font-size: 9px;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .badge-role-admin {
+            background: rgba(99, 102, 241, .2);
+            color: var(--accent);
+        }
+
+        .badge-role-user {
+            background: rgba(148, 163, 184, .15);
+            color: var(--text-secondary);
+        }
+
+        /* Chart container */
+        .chart-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent);
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .tab-content.active {
+            animation: fadeIn .3s ease;
+        }
+
+        .pulse {
+            animation: pulse-anim 2s infinite;
+        }
+
+        @keyframes pulse-anim {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .5
+            }
+        }
+
+        /* Modal */
+        .modal-dark .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .modal-dark .modal-header {
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .modal-dark pre {
+            background: var(--bg-secondary);
+            color: var(--accent2);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        /* Alert severity badges */
+        .sev-CRITICAL {
+            background: rgba(239, 68, 68, .2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, .3);
+        }
+
+        .sev-HIGH {
+            background: rgba(245, 158, 11, .2);
+            color: #fcd34d;
+            border: 1px solid rgba(245, 158, 11, .3);
+        }
+
+        .sev-MEDIUM {
+            background: rgba(99, 102, 241, .2);
+            color: #a5b4fc;
+            border: 1px solid rgba(99, 102, 241, .3);
+        }
+
+        .sev-LOW {
+            background: rgba(16, 185, 129, .2);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, .3);
+        }
+
+        /* Toast notification */
+        .alert-toast {
+            position: fixed;
+            top: 70px;
+            right: 24px;
+            z-index: 9999;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px 18px;
+            min-width: 320px;
+            max-width: 420px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            animation: slideIn .3s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, .4);
+        }
+
+        .alert-toast.CRITICAL {
+            border-left: 4px solid #ef4444;
+        }
+
+        .alert-toast.HIGH {
+            border-left: 4px solid #f59e0b;
+        }
+
+        .alert-toast.MEDIUM {
+            border-left: 4px solid #6366f1;
+        }
+
+        .alert-toast.LOW {
+            border-left: 4px solid #10b981;
+        }
+
+        .alert-toast .toast-icon {
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .alert-toast .toast-body {
+            flex: 1;
+        }
+
+        .alert-toast .toast-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .alert-toast .toast-msg {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .alert-toast .toast-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
+            padding: 0;
+        }
+
+        .alert-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            background: #ef4444;
+            color: #fff;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            min-width: 18px;
+            text-align: center;
+        }
+
+        .tab-btn-wrap {
+            position: relative;
+            display: inline-block;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navbar -->
+    <div class="admin-nav">
+        <div class="brand">🛡️ Packet<span>Dukjub</span> <span
+                style="color:var(--text-secondary);font-size:13px;font-weight:400;">Admin Console</span></div>
+        <div class="nav-right">
+            <span class="badge-admin">👑 ADMIN</span>
+            <span style="color:var(--text-secondary);font-size:13px;" id="adminUsername">—</span>
+            <button class="btn-outline" onclick="logout()" style="padding:6px 14px;font-size:12px;">Logout</button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('monitor')">📡 Network Monitor</button>
+        <button class="tab-btn" onclick="switchTab('history')">📋 Packet History</button>
+        <button class="tab-btn" onclick="switchTab('users')">👥 User Management</button>
+        <button class="tab-btn" onclick="switchTab('export')">📤 Export Data</button>
+        <button class="tab-btn" onclick="switchTab('alerts')">🚨 Security Alerts</button>
+    </div>
+
+    <!-- ===== TAB 1: LIVE MONITOR ===== -->
+    <div class="tab-content active" id="tab-monitor">
+        <!-- Controls -->
+        <div class="ctrl-bar">
+            <select id="selectIface" style="min-width:260px;">
+                <option>Loading interfaces...</option>
+            </select>
+            <button class="btn-accent" id="startBtn" onclick="startSniff()">▶ Start Capture</button>
+            <button class="btn-danger d-none" id="stopBtn" onclick="stopSniff()">⏹ Stop</button>
+            <span id="liveIndicator" class="d-none" style="color:var(--success);font-size:12px;">● <span
+                    class="pulse">LIVE</span></span>
+            <div style="flex:1;"></div>
+            <select id="filterProto">
+                <option value="">All Protocols</option>
+                <option value="TCP">TCP</option>
+                <option value="UDP">UDP</option>
+                <option value="HTTPS">HTTPS</option>
+                <option value="HTTP">HTTP</option>
+                <option value="DNS">DNS</option>
+                <option value="QUIC">QUIC</option>
+            </select>
+            <input type="text" id="filterIP" placeholder="Filter IP..." style="width:160px;">
+            <input type="text" id="filterPort" placeholder="Port" style="width:80px;">
+        </div>
+
+        <!-- Stats -->
+        <div class="stat-row">
+            <div class="card-dark stat-glow-indigo">
+                <h6>Total Packets</h6>
+                <div class="value" id="statTotal">0</div>
+            </div>
+            <div class="card-dark stat-glow-cyan">
+                <h6>Unique IPs</h6>
+                <div class="value" id="statIPs">0</div>
+            </div>
+            <div class="card-dark stat-glow-green">
+                <h6>Online Users</h6>
+                <div class="value" id="statOnline">0</div>
+            </div>
+            <div class="card-dark stat-glow-green">
+                <h6>Encrypted</h6>
+                <div class="value" id="statEnc">0</div>
+            </div>
+            <div class="card-dark stat-glow-red">
+                <h6>Plaintext</h6>
+                <div class="value" id="statPlain">0</div>
+            </div>
+            <div class="card-dark stat-glow-warn">
+                <h6>Bandwidth</h6>
+                <div class="value" id="statBW">0 KB/s</div>
+            </div>
+        </div>
+
+        <!-- Online Users Panel -->
+        <div class="online-panel">
+            <h6>🟢 Online Users (<span id="onlineCount2">0</span>)</h6>
+            <div id="onlineUsersList" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
+        </div>
+
+        <!-- Charts -->
+        <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="chart-box"><canvas id="lineChart"></canvas></div>
+            <div class="chart-box"><canvas id="pieChart"></canvas></div>
+            <div class="chart-box"><canvas id="barChart"></canvas></div>
+        </div>
+
+        <!-- Live Table -->
+        <div class="table-scroll" id="liveTableScroll">
+            <table class="table-dark-custom">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Protocol</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Port</th>
+                        <th>Size</th>
+                        <th>Status</th>
+                        <th>TLS</th>
+                        <th>Cipher</th>
+                    </tr>
+                </thead>
+                <tbody id="packetTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== TAB 2: HISTORY ===== -->
+    <div class="tab-content" id="tab-history">
+        <div class="ctrl-bar">
+            <select id="historyUserFilter">
+                <option value="">👥 All Users (ทุกคน)</option>
+            </select>
+            <input type="text" id="historySearch" placeholder="🔍 Search packets (IP, protocol, cipher...)"
+                style="flex:1;">
+            <button class="btn-outline" onclick="clearHistory()">🗑 Clear</button>
+            <span style="color:var(--text-secondary);font-size:13px;" id="historyCount">0 records</span>
+        </div>
+        <div class="table-scroll" style="max-height:calc(100vh - 220px);">
+            <table class="table-dark-custom">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Time</th>
+                        <th>User</th>
+                        <th>Protocol</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Port</th>
+                        <th>Size</th>
+                        <th>Encryption</th>
+                        <th>TLS</th>
+                        <th>Cipher</th>
+                        <th>Cert</th>
+                    </tr>
+                </thead>
+                <tbody id="historyTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== TAB 3: USERS ===== -->
+    <div class="tab-content" id="tab-users">
+        <div class="ctrl-bar">
+            <h5 style="margin:0;font-size:16px;">👥 User Management</h5>
+            <span style="color:var(--success);font-size:13px;" id="userOnlineInfo">0 online</span>
+            <div style="flex:1;"></div>
+            <button class="btn-outline" onclick="loadUsers()">🔄 Refresh</button>
+        </div>
+        <div class="table-scroll" style="max-height:calc(100vh - 220px);">
+            <table class="table-dark-custom">
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Username</th>
+                        <th>Role</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== TAB 4: EXPORT ===== -->
+    <div class="tab-content" id="tab-export">
+        <div style="max-width:600px;">
+            <div class="card-dark">
+                <h5 style="margin-bottom:16px;">📤 Export Captured Data</h5>
+                <p style="color:var(--text-secondary);font-size:13px;margin-bottom:20px;">Export all captured packet
+                    history to CSV or JSON format for analysis in external tools.</p>
+                <div style="display:flex;gap:12px;margin-bottom:20px;">
+                    <div style="flex:1;" class="card-dark" style="cursor:pointer;" onclick="exportCSV()">
+                        <h6>CSV Format</h6>
+                        <p style="font-size:12px;color:var(--text-secondary);margin:0;">Compatible with Excel, Google
+                            Sheets</p>
+                        <button class="btn-accent" style="margin-top:12px;width:100%;" onclick="exportCSV()">📄 Export
+                            CSV</button>
+                    </div>
+                    <div style="flex:1;" class="card-dark" style="cursor:pointer;" onclick="exportJSON()">
+                        <h6>JSON Format</h6>
+                        <p style="font-size:12px;color:var(--text-secondary);margin:0;">For programmatic analysis, APIs
+                        </p>
+                        <button class="btn-outline"
+                            style="margin-top:12px;width:100%;border-color:var(--accent2);color:var(--accent2);"
+                            onclick="exportJSON()">{ } Export JSON</button>
+                    </div>
+                </div>
+                <p style="font-size:12px;color:var(--text-secondary);">📊 Records available: <strong id="exportCount"
+                        style="color:var(--accent);">0</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Packet Detail Modal -->
+    <div class="modal fade modal-dark" id="packetModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📦 Packet Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="packetDetailContent"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ===== TAB 5: SECURITY ALERTS ===== -->
+    <div class="tab-content" id="tab-alerts">
+        <!-- Alert Stats Row -->
+        <div class="stat-row" style="grid-template-columns:repeat(5,1fr);">
+            <div class="card-dark stat-glow-red">
+                <h6>Total Alerts</h6>
+                <div class="value" id="alertStatTotal">0</div>
+            </div>
+            <div class="card-dark">
+                <h6 style="color:#ef4444">Critical</h6>
+                <div class="value" id="alertStatCrit" style="color:#ef4444">0</div>
+            </div>
+            <div class="card-dark">
+                <h6 style="color:#f59e0b">High</h6>
+                <div class="value" id="alertStatHigh" style="color:#f59e0b">0</div>
+            </div>
+            <div class="card-dark">
+                <h6 style="color:#6366f1">Medium</h6>
+                <div class="value" id="alertStatMed" style="color:#6366f1">0</div>
+            </div>
+            <div class="card-dark stat-glow-green">
+                <h6>Acknowledged</h6>
+                <div class="value" id="alertStatAck">0</div>
+            </div>
+        </div>
+
+        <!-- Threshold Config -->
+        <div class="card-dark" style="margin-bottom:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <h6 style="margin:0;font-size:13px;color:var(--text-primary);">⚙️ Detection Thresholds</h6>
+                <button class="btn-accent" style="padding:6px 16px;font-size:12px;"
+                    onclick="saveThresholds()">Save</button>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+                <div>
+                    <label style="font-size:11px;color:var(--text-secondary);">Packets/sec (DoS)</label>
+                    <input type="number" id="thrPacketRate" value="500" class="ctrl-bar"
+                        style="width:100%;margin:4px 0 0;padding:6px 10px;border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:var(--text-secondary);">Port Scan Count</label>
+                    <input type="number" id="thrPortScan" value="15" class="ctrl-bar"
+                        style="width:100%;margin:4px 0 0;padding:6px 10px;border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:var(--text-secondary);">Brute Force Count</label>
+                    <input type="number" id="thrBruteForce" value="20" class="ctrl-bar"
+                        style="width:100%;margin:4px 0 0;padding:6px 10px;border-radius:6px;">
+                </div>
+                <div>
+                    <label style="font-size:11px;color:var(--text-secondary);">Cert Expiry Warning (days)</label>
+                    <input type="number" id="thrCertExpiry" value="30" class="ctrl-bar"
+                        style="width:100%;margin:4px 0 0;padding:6px 10px;border-radius:6px;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Alert Filters -->
+        <div class="ctrl-bar">
+            <select id="alertFilterSeverity" onchange="renderAlerts()">
+                <option value="">All Severities</option>
+                <option value="CRITICAL">🔴 Critical</option>
+                <option value="HIGH">🟠 High</option>
+                <option value="MEDIUM">🟡 Medium</option>
+                <option value="LOW">🔵 Low</option>
+            </select>
+            <select id="alertFilterType" onchange="renderAlerts()">
+                <option value="">All Types</option>
+                <option value="INSECURE_PROTOCOL">Insecure Protocol</option>
+                <option value="WEAK_TLS">Weak TLS</option>
+                <option value="CERT_EXPIRY">Cert Expiry</option>
+                <option value="PORT_SCAN">Port Scan</option>
+                <option value="BRUTE_FORCE">Brute Force</option>
+                <option value="DOS_ATTEMPT">DoS Attempt</option>
+            </select>
+            <select id="alertFilterAck" onchange="renderAlerts()">
+                <option value="">All Status</option>
+                <option value="unacked">Unacknowledged</option>
+                <option value="acked">Acknowledged</option>
+            </select>
+            <div style="flex:1;"></div>
+            <button class="btn-outline" onclick="ackAllAlerts()" style="font-size:12px;">✓ Ack All</button>
+            <button class="btn-outline" onclick="clearAlerts()"
+                style="font-size:12px;border-color:var(--danger);color:var(--danger);">🗑 Clear</button>
+            <span style="color:var(--text-secondary);font-size:13px;" id="alertCount">0 alerts</span>
+        </div>
+
+        <!-- Alerts Table -->
+        <div class="table-scroll" style="max-height:calc(100vh - 360px);">
+            <table class="table-dark-custom">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Severity</th>
+                        <th>Type</th>
+                        <th>Message</th>
+                        <th>Source</th>
+                        <th>Details</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="alertsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const url = "http://localhost:3000";
+        axios.defaults.withCredentials = true;
+        const socket = io(url);
+
+        // ========== AUTH ==========
+        let currentOnlineUsers = [];
+        let myUser = null;  // เก็บ user info ไว้ส่ง identify ซ้ำได้
+
+        async function checkRole() {
+            try {
+                const res = await axios.get(`${url}/auth/me`);
+                if (res.data.user.role !== 'admin') { window.location.href = 'user.html'; return; }
+                document.getElementById('adminUsername').textContent = res.data.user.username;
+                myUser = { username: res.data.user.username, role: 'admin' };
+                // ถ้า socket connected แล้ว → ส่ง identify ทันที
+                if (socket.connected) {
+                    socket.emit('identify', myUser);
+                }
+            } catch { window.location.href = 'login.html'; }
+        }
+        document.addEventListener('DOMContentLoaded', () => { checkRole(); loadUsers(); });
+        function logout() { axios.post(`${url}/auth/logout`).then(() => window.location.href = 'login.html'); }
+
+        // ========== TABS ==========
+        function switchTab(name) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            event.target.classList.add('active');
+            if (name === 'history') renderHistory();
+            if (name === 'users') loadUsers();
+            if (name === 'export') document.getElementById('exportCount').textContent = packetHistory.length;
+        }
+
+        // ========== STATE ==========
+        let isSniffing = false;
+        let packetHistory = [];  // เก็บ ALL packets
+        let uniqueIPs = new Set();
+        let totalPkts = 0, encCount = 0, plainCount = 0;
+        let packetCountInSecond = 0;
+
+        // ========== CHARTS ==========
+        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.borderColor = 'rgba(42,51,82,.5)';
+        const lineChart = new Chart(document.getElementById('lineChart'), {
+            type: 'line', data: { labels: [], datasets: [{ label: 'Packets/sec', data: [], borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,.1)', fill: true, tension: .4, pointRadius: 2 }] },
+            options: { animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
+        });
+        const pieChart = new Chart(document.getElementById('pieChart'), {
+            type: 'doughnut', data: { labels: ['Encrypted', 'Plaintext'], datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
+            options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8 } } } }
+        });
+        const barChart = new Chart(document.getElementById('barChart'), {
+            type: 'bar', data: { labels: ['TCP', 'UDP', 'DNS', 'HTTP', 'HTTPS', 'QUIC'], datasets: [{ label: 'Count', data: [0, 0, 0, 0, 0, 0], backgroundColor: ['#6366f1', '#f59e0b', '#22d3ee', '#fb923c', '#10b981', '#a855f7'], borderRadius: 4 }] },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
+        });
+
+        function getProtoIndex(p) {
+            if (p.includes('QUIC')) return 5; if (p.includes('HTTPS')) return 4; if (p.includes('HTTP')) return 3;
+            if (p.includes('DNS')) return 2; if (p.includes('UDP')) return 1; if (p.includes('TCP')) return 0; return -1;
+        }
+        function getProtoBadge(p) {
+            if (p.includes('HTTPS')) return 'badge-https'; if (p.includes('HTTP')) return 'badge-http';
+            if (p.includes('QUIC')) return 'badge-quic'; if (p.includes('DNS')) return 'badge-dns';
+            if (p.includes('UDP')) return 'badge-udp'; return 'badge-tcp';
+        }
+
+        // ========== SOCKET ==========
+        socket.on('connect', () => {
+            console.log('✅ Socket connected:', socket.id);
+            socket.emit('request_interfaces');
+            socket.emit('request_online_users');
+            // ★ ส่ง identify ทุกครั้งที่ connect/reconnect
+            if (myUser) {
+                socket.emit('identify', myUser);
+                console.log('📤 Sent identify:', myUser.username);
+            }
+        });
+
+        // ========== ONLINE USERS ==========
+        socket.on('online_users', (users) => {
+            currentOnlineUsers = users;
+            const count = users.length;
+            document.getElementById('statOnline').textContent = count;
+            document.getElementById('onlineCount2').textContent = count;
+
+            // Render online users panel
+            const panel = document.getElementById('onlineUsersList');
+            panel.innerHTML = users.map(u => `
+        <div class="online-user-item">
+            <span class="dot-online"></span>
+            <span>${u.username}</span>
+            <span class="badge-role ${u.role === 'admin' ? 'badge-role-admin' : 'badge-role-user'}">${u.role}</span>
+        </div>
+    `).join('');
+
+            // Update user filter dropdown in history
+            const sel = document.getElementById('historyUserFilter');
+            const currentVal = sel.value;
+            sel.innerHTML = '<option value="">👥 All Users (ทุกคน)</option>';
+            // Get unique usernames from history + online
+            const allUsernames = new Set(users.map(u => u.username));
+            packetHistory.forEach(p => { if (p._user) allUsernames.add(p._user); });
+            allUsernames.forEach(name => {
+                const isOn = users.some(u => u.username === name);
+                sel.innerHTML += `<option value="${name}">${isOn ? '🟢' : '⚪'} ${name}</option>`;
+            });
+            sel.value = currentVal;
+
+            // Update online status in users tab if visible
+            if (document.getElementById('tab-users').classList.contains('active')) loadUsers();
+        });
+
+        socket.on('available_interfaces', (list) => {
+            const sel = document.getElementById('selectIface');
+            sel.innerHTML = '';
+            list.forEach(i => {
+                const o = document.createElement('option');
+                o.value = i.name; o.textContent = i.description;
+                if (i.description.toLowerCase().includes('wi-fi')) o.selected = true;
+                sel.appendChild(o);
+            });
+        });
+
+        socket.on('network_stats', (s) => {
+            document.getElementById('statBW').textContent = (s.bytes / 1024).toFixed(1) + ' KB/s';
+        });
+
+        socket.on('update_dashboard', (data) => {
+            // Admin รับทุก packet เสมอ (ไม่ต้องเช็ค isSniffing)
+
+            // Store to history ก่อน filter
+            data._time = new Date().toLocaleTimeString();
+            data._ts = Date.now();
+            data._user = data._user || 'network';
+            packetHistory.push(data);
+
+            // Stats (อัพเดทเสมอ)
+            totalPkts++;
+            uniqueIPs.add(data.src); uniqueIPs.add(data.dst);
+            const isEnc = data.encryption && data.encryption.includes('Encrypted');
+            if (isEnc) encCount++; else plainCount++;
+            packetCountInSecond++;
+
+            document.getElementById('statTotal').textContent = totalPkts;
+            document.getElementById('statIPs').textContent = uniqueIPs.size;
+            document.getElementById('statEnc').textContent = encCount;
+            document.getElementById('statPlain').textContent = plainCount;
+
+            // Pie
+            pieChart.data.datasets[0].data = [encCount, plainCount];
+            pieChart.update('none');
+
+            // Bar
+            const idx = getProtoIndex(data.protocol);
+            if (idx >= 0) { barChart.data.datasets[0].data[idx]++; barChart.update('none'); }
+
+            // แสดง LIVE indicator ถ้ามีแพ็กเก็ตเข้ามา
+            if (!isSniffing) {
+                isSniffing = true;
+                document.getElementById('liveIndicator').classList.remove('d-none');
+            }
+
+            // Filter สำหรับ live table เท่านั้น
+            const fp = document.getElementById('filterProto').value;
+            const fi = document.getElementById('filterIP').value;
+            const fport = document.getElementById('filterPort').value;
+            if (fp && !data.protocol.includes(fp)) return;
+            if (fi && !data.src.includes(fi) && !data.dst.includes(fi)) return;
+            if (fport && data.port.toString() !== fport) return;
+
+            // Table row
+            const tbody = document.getElementById('packetTableBody');
+            const row = tbody.insertRow(0);
+            row.onclick = () => showDetail(data);
+            const tlsV = data.tls_version || 'N/A';
+            const cipher = data.cipher && data.cipher !== 'N/A' ? data.cipher : '-';
+            const hasAlert = data.alerts && data.alerts.length > 0;
+            if (hasAlert) row.style.background = 'rgba(239, 68, 68, 0.15)';
+            const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
+
+            row.innerHTML = `
+        <td style="color:var(--text-secondary)">${data._time}</td>
+        <td><span class="badge-proto ${getProtoBadge(data.protocol)}">${alertIcon}${data.protocol}</span></td>
+        <td>${data.src}</td><td>${data.dst}</td>
+        <td style="color:var(--accent)">${data.port || '-'}</td>
+        <td>${data.size}B</td>
+        <td><span class="badge-proto ${isEnc ? 'badge-enc' : 'badge-plain'}">${isEnc ? '🔒 Encrypted' : '⚠ Plain'}</span></td>
+        <td style="color:var(--accent2)">${tlsV}</td>
+        <td style="font-size:11px">${cipher}</td>
+    `;
+            if (tbody.rows.length > 200) tbody.deleteRow(200);
+        });
+
+        // ========== CONTROLS ==========
+        function startSniff() {
+            const iface = document.getElementById('selectIface').value;
+            socket.emit('control_sniffer', { action: 'start', iface });
+            isSniffing = true;
+            document.getElementById('startBtn').classList.add('d-none');
+            document.getElementById('stopBtn').classList.remove('d-none');
+            document.getElementById('liveIndicator').classList.remove('d-none');
+        }
+        function stopSniff() {
+            socket.emit('control_sniffer', { action: 'stop' });
+            isSniffing = false;
+            document.getElementById('startBtn').classList.remove('d-none');
+            document.getElementById('stopBtn').classList.add('d-none');
+            document.getElementById('liveIndicator').classList.add('d-none');
+        }
+        document.getElementById('selectIface').addEventListener('change', () => { if (isSniffing) stopSniff(); });
+
+        // Line chart interval
+        setInterval(() => {
+            const now = new Date().toLocaleTimeString();
+            lineChart.data.labels.push(now);
+            lineChart.data.datasets[0].data.push(packetCountInSecond);
+            if (lineChart.data.labels.length > 20) { lineChart.data.labels.shift(); lineChart.data.datasets[0].data.shift(); }
+            lineChart.update();
+            packetCountInSecond = 0;
+        }, 1000);
+
+        // Filter handlers
+        ['filterProto', 'filterIP', 'filterPort'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                document.querySelectorAll('#packetTableBody tr').forEach(row => {
+                    const fp = document.getElementById('filterProto').value;
+                    const fi = document.getElementById('filterIP').value;
+                    const fport = document.getElementById('filterPort').value;
+                    let show = true;
+                    if (fp && !row.cells[1].innerText.includes(fp)) show = false;
+                    if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
+                    if (fport && row.cells[4].innerText !== fport) show = false;
+                    row.style.display = show ? '' : 'none';
+                });
+            });
+        });
+
+        // ========== PACKET DETAIL ==========
+        function showDetail(data) {
+            let detail = JSON.stringify(data, null, 2);
+            if (data.cert_issuer || data.cert_subject) {
+                detail += '\n\n=== 📜 Certificate ===\n';
+                detail += 'Subject: ' + (data.cert_subject || 'N/A') + '\n';
+                detail += 'Issuer:  ' + (data.cert_issuer || 'N/A') + '\n';
+                detail += 'Valid:   ' + (data.cert_not_before || '?') + ' ~ ' + (data.cert_not_after || '?') + '\n';
+                detail += 'SAN:     ' + (data.cert_san || 'N/A') + '\n';
+            }
+            document.getElementById('packetDetailContent').innerText = detail;
+            new bootstrap.Modal(document.getElementById('packetModal')).show();
+        }
+
+        // ========== HISTORY ==========
+        function renderHistory() {
+            const q = document.getElementById('historySearch').value.toLowerCase();
+            const userFilter = document.getElementById('historyUserFilter').value;
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+            let filtered = packetHistory;
+            if (userFilter) filtered = filtered.filter(p => p._user === userFilter);
+            if (q) filtered = filtered.filter(p =>
+                (p.protocol + p.src + p.dst + p.port + (p.cipher || '') + (p.tls_version || '') + (p.cert || '') + (p._user || '')).toLowerCase().includes(q)
+            );
+            document.getElementById('historyCount').textContent = filtered.length + ' records';
+
+            const slice = filtered.slice(-500).reverse();
+            slice.forEach((d, i) => {
+                const row = tbody.insertRow();
+                row.onclick = () => showDetail(d);
+                const isEnc = d.encryption && d.encryption.includes('Encrypted');
+                const hasAlert = d.alerts && d.alerts.length > 0;
+                if (hasAlert) row.style.background = 'rgba(239, 68, 68, 0.15)';
+                const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
+
+                row.innerHTML = `
+            <td style="color:var(--text-secondary)">${filtered.length - i}</td>
+            <td>${d._time || '—'}</td>
+            <td><span style="color:var(--accent);font-size:11px">${d._user || '—'}</span></td>
+            <td><span class="badge-proto ${getProtoBadge(d.protocol)}">${alertIcon}${d.protocol}</span></td>
+            <td>${d.src}</td><td>${d.dst}</td>
+            <td style="color:var(--accent)">${d.port || '-'}</td>
+            <td>${d.size}B</td>
+            <td><span class="badge-proto ${isEnc ? 'badge-enc' : 'badge-plain'}">${isEnc ? 'Encrypted' : 'Plain'}</span></td>
+            <td style="color:var(--accent2)">${d.tls_version || '-'}</td>
+            <td style="font-size:11px">${d.cipher && d.cipher !== 'N/A' ? d.cipher : '-'}</td>
+            <td style="font-size:11px">${d.cert && d.cert !== 'N/A' ? d.cert : '-'}</td>
+        `;
+            });
+        }
+        document.getElementById('historySearch').addEventListener('input', renderHistory);
+        document.getElementById('historyUserFilter').addEventListener('change', renderHistory);
+        function clearHistory() { if (confirm('Clear all history?')) { packetHistory = []; renderHistory(); } }
+
+        // ========== USERS ==========
+        async function loadUsers() {
+            try {
+                const res = await axios.get(`${url}/auth/users`);
+                const tbody = document.getElementById('usersTableBody');
+                tbody.innerHTML = '';
+                const onlineNames = currentOnlineUsers.map(u => u.username);
+                const onlineCount = new Set(onlineNames).size;
+                document.getElementById('userOnlineInfo').textContent = onlineCount + ' online';
+
+                res.data.forEach(u => {
+                    const row = tbody.insertRow();
+                    const isAdmin = u.role === 'admin';
+                    const isOnline = onlineNames.includes(u.username);
+                    row.innerHTML = `
+                <td><span class="${isOnline ? 'dot-online' : 'dot-offline'}"></span>${isOnline ? 'Online' : 'Offline'}</td>
+                <td><span style="color:${isAdmin ? 'var(--accent)' : 'var(--text-primary)'};font-weight:${isAdmin ? 600 : 400}">${isAdmin ? '👑 ' : ''}${u.username}</span></td>
+                <td>
+                    <select class="user-role-select" onchange="changeRole('${u.username}',this.value)">
+                        <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
+                        <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </td>
+                <td style="color:var(--text-secondary);font-size:12px">${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</td>
+                <td>${!isAdmin ? `<button class="btn-danger" onclick="deleteUser('${u.username}')">🗑 Delete</button>` : '<span style="color:var(--text-secondary);font-size:11px;">Protected</span>'}</td>
+            `;
+                });
+            } catch (e) { console.error('Load users failed:', e); }
+        }
+        async function changeRole(username, role) {
+            try { await axios.put(`${url}/auth/users/${username}/role`, { role }); loadUsers(); }
+            catch (e) { alert(e.response?.data?.message || 'Error'); loadUsers(); }
+        }
+        async function deleteUser(username) {
+            if (!confirm(`Delete user "${username}"?`)) return;
+            try { await axios.delete(`${url}/auth/users/${username}`); loadUsers(); }
+            catch (e) { alert(e.response?.data?.message || 'Error'); }
+        }
+
+        // ========== EXPORT ==========
+        function exportCSV() {
+            if (!packetHistory.length) return alert('No data to export');
+            const headers = ['Time', 'Protocol', 'Source', 'Destination', 'Port', 'Size', 'Encryption', 'TLS Version', 'Cipher', 'Certificate'];
+            const rows = packetHistory.map(d => [
+                d._time || '', d.protocol || '', d.src || '', d.dst || '', d.port || '', d.size || '',
+                d.encryption || '', d.tls_version || '', (d.cipher || '').replace(/,/g, ';'), (d.cert || '').replace(/,/g, ';')
+            ]);
+            let csv = headers.join(',') + '\n' + rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+            download(csv, 'packetdukjub_export.csv', 'text/csv');
+        }
+        function exportJSON() {
+            if (!packetHistory.length) return alert('No data to export');
+            const clean = packetHistory.map(d => ({
+                time: d._time, protocol: d.protocol, src: d.src, dst: d.dst, port: d.port, size: d.size,
+                encryption: d.encryption, tls_version: d.tls_version, cipher: d.cipher, cert: d.cert,
+                cert_subject: d.cert_subject, cert_issuer: d.cert_issuer, cert_san: d.cert_san,
+                cert_not_before: d.cert_not_before, cert_not_after: d.cert_not_after
+            }));
+            download(JSON.stringify(clean, null, 2), 'packetdukjub_export.json', 'application/json');
+        }
+        function download(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+        // ========== ALERT SYSTEM ==========
+        let allAlerts = [];
+        let unackedCount = 0;
+        const SEVERITY_ICON = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵' };
+        const TYPE_LABEL = {
+            INSECURE_PROTOCOL: '🔓 Insecure Protocol',
+            WEAK_TLS: '🔐 Weak TLS',
+            CERT_EXPIRY: '📜 Cert Expiry',
+            PORT_SCAN: '🔍 Port Scan',
+            BRUTE_FORCE: '💥 Brute Force',
+            DOS_ATTEMPT: '🌊 DoS Attempt',
+        };
+
+        socket.on('new_alert', (alert) => {
+            allAlerts.unshift(alert);
+            if (!alert.acknowledged) unackedCount++;
+            updateAlertStats();
+            showToast(alert);
+            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
+        });
+
+        socket.on('alert_acknowledged', (alertId) => {
+            const a = allAlerts.find(x => x.id === alertId);
+            if (a && !a.acknowledged) { a.acknowledged = true; unackedCount = Math.max(0, unackedCount - 1); }
+            updateAlertStats();
+            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
+        });
+
+        // Fetch existing alerts on connect
+        socket.on('alert_history', (alerts) => {
+            allAlerts = alerts;
+            unackedCount = alerts.filter(a => !a.acknowledged).length;
+            updateAlertStats();
+            renderAlerts();
+        });
+        socket.emit('request_alerts');
+
+        function updateAlertStats() {
+            const total = allAlerts.length;
+            const crit = allAlerts.filter(a => a.severity === 'CRITICAL').length;
+            const high = allAlerts.filter(a => a.severity === 'HIGH').length;
+            const med = allAlerts.filter(a => a.severity === 'MEDIUM').length;
+            const acked = allAlerts.filter(a => a.acknowledged).length;
+            document.getElementById('alertStatTotal').textContent = total;
+            document.getElementById('alertStatCrit').textContent = crit;
+            document.getElementById('alertStatHigh').textContent = high;
+            document.getElementById('alertStatMed').textContent = med;
+            document.getElementById('alertStatAck').textContent = acked;
+            // Tab badge for unacked alerts
+            const badge = document.getElementById('alertTabBadge');
+            if (unackedCount > 0) {
+                badge.textContent = unackedCount > 99 ? '99+' : unackedCount;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+        }
+
+        function renderAlerts() {
+            const sevFilter = document.getElementById('alertFilterSeverity').value;
+            const typeFilter = document.getElementById('alertFilterType').value;
+            const ackFilter = document.getElementById('alertFilterAck').value;
+            let filtered = allAlerts;
+            if (sevFilter) filtered = filtered.filter(a => a.severity === sevFilter);
+            if (typeFilter) filtered = filtered.filter(a => a.type === typeFilter);
+            if (ackFilter === 'unacked') filtered = filtered.filter(a => !a.acknowledged);
+            if (ackFilter === 'acked') filtered = filtered.filter(a => a.acknowledged);
+
+            document.getElementById('alertCount').textContent = filtered.length + ' alerts';
+            const tbody = document.getElementById('alertsTableBody');
+            tbody.innerHTML = '';
+
+            filtered.forEach(a => {
+                const row = tbody.insertRow();
+                if (a.acknowledged) row.style.opacity = '0.45';
+                const det = a.details || {};
+                const detStr = Object.entries(det).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+                row.innerHTML = `
+            <td style="color:var(--text-secondary);white-space:nowrap">${a._time}</td>
+            <td><span class="badge-proto sev-${a.severity}">${SEVERITY_ICON[a.severity]} ${a.severity}</span></td>
+            <td style="font-size:11px;white-space:nowrap">${TYPE_LABEL[a.type] || a.type}</td>
+            <td style="font-size:12px">${a.message}</td>
+            <td style="font-size:11px;color:var(--accent2)">${det.src || '—'}</td>
+            <td style="font-size:10px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${detStr}">${detStr}</td>
+            <td>${a.acknowledged
+                        ? '<span style="color:var(--success);font-size:11px;">✓ Acked</span>'
+                        : `<button class="btn-outline" style="padding:3px 10px;font-size:11px;" onclick="ackAlert('${a.id}')">Ack</button>`
+                    }</td>
+        `;
+            });
+        }
+
+        function ackAlert(id) {
+            socket.emit('acknowledge_alert', id);
+        }
+        function ackAllAlerts() {
+            allAlerts.filter(a => !a.acknowledged).forEach(a => socket.emit('acknowledge_alert', a.id));
+        }
+        function clearAlerts() {
+            if (!confirm('Clear all alerts?')) return;
+            allAlerts = [];
+            unackedCount = 0;
+            updateAlertStats();
+            renderAlerts();
+        }
+
+        function saveThresholds() {
+            axios.put(`${url}/alerts/thresholds`, {
+                packetRatePerSec: parseInt(document.getElementById('thrPacketRate').value),
+                portScanCount: parseInt(document.getElementById('thrPortScan').value),
+                bruteForceCount: parseInt(document.getElementById('thrBruteForce').value),
+                certExpiryWarningDays: parseInt(document.getElementById('thrCertExpiry').value),
+            }).then(() => {
+                const btn = document.querySelector('[onclick="saveThresholds()"]');
+                btn.textContent = '✓ Saved';
+                setTimeout(() => btn.textContent = 'Save', 2000);
+            });
+        }
+
+        // Toast notifications
+        let toastQueue = [];
+        let toastShowing = false;
+        function showToast(alert) {
+            toastQueue.push(alert);
+            if (!toastShowing) processToastQueue();
+        }
+        function processToastQueue() {
+            if (!toastQueue.length) { toastShowing = false; return; }
+            toastShowing = true;
+            const a = toastQueue.shift();
+            const toast = document.createElement('div');
+            toast.className = `alert-toast ${a.severity}`;
+            toast.innerHTML = `
+        <div class="toast-icon">${SEVERITY_ICON[a.severity]}</div>
+        <div class="toast-body">
+            <div class="toast-title">${TYPE_LABEL[a.type] || a.type} — ${a.severity}</div>
+            <div class="toast-msg">${a.message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove();processToastQueue()">×</button>
+    `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slideOut .3s ease forwards';
+                setTimeout(() => { toast.remove(); processToastQueue(); }, 300);
+            }, 5000);
+        }
+
+        // Also add 'alerts' to switchTab
+        const _origSwitchTab = switchTab;
+        // Patch switchTab to handle alerts tab
+        // (replace the existing switchTab function entirely:)
+        function switchTab(name) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById('tab-' + name).classList.add('active');
+            event.target.classList.add('active');
+            if (name === 'history') {
+                const sel = document.getElementById('historyUserFilter');
+                const current = sel.value;
+                sel.innerHTML = '<option value="">👥 All Users (ทุกคน)</option>';
+                const names = new Set(packetHistory.map(p => p._user).filter(Boolean));
+                names.forEach(n => {
+                    const isOn = currentOnlineUsers.some(u => u.username === n);
+                    sel.innerHTML += `<option value="${n}">${isOn ? '🟢' : '⚪'} ${n}</option>`;
+                });
+                sel.value = current;
+                renderHistory();
+            }
+            if (name === 'users') loadUsers();
+            if (name === 'export') document.getElementById('exportCount').textContent = packetHistory.length;
+            if (name === 'alerts') renderAlerts();
+        }
+    </script>
+</body>
+
+</html>

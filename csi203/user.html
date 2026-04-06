@@ -1,0 +1,600 @@
+
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PacketDukjub - Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+    <style>
+        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        .chart-container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1); margin-bottom: 20px; }
+        .table-container { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,.1); max-height: 500px; overflow-y: auto; }
+        .status-encrypted { color: #198754; font-weight: bold; }
+        .status-plaintext { color: #dc3545; font-weight: bold; }
+        #packetTableBody tr:hover, #historyTableBody tr:hover { background-color: #f1f1f1; cursor: pointer; }
+
+        /* Tab system */
+        .user-tabs { display:flex; gap:0; background:#fff; border-bottom:2px solid #dee2e6; padding:0 16px; }
+        .user-tab-btn { padding:12px 24px; border:none; background:transparent; color:#6c757d; font-size:14px; font-weight:500; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; transition:all .2s; }
+        .user-tab-btn:hover { color:#0d6efd; background:#f0f6ff; }
+        .user-tab-btn.active { color:#0d6efd; border-bottom-color:#0d6efd; font-weight:600; }
+        .user-tab-content { display:none; }
+        .user-tab-content.active { display:block; }
+
+        /* History controls */
+        .history-ctrl { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:16px; }
+        .history-ctrl input { flex:1; min-width:200px; }
+        .btn-export { border:1px solid #dee2e6; background:#fff; padding:6px 16px; border-radius:6px; font-size:13px; cursor:pointer; transition:all .15s; }
+        .btn-export:hover { border-color:#0d6efd; color:#0d6efd; }
+        .history-stats { display:flex; gap:20px; margin-bottom:16px; }
+        .history-stat { background:#fff; border:1px solid #dee2e6; border-radius:8px; padding:12px 20px; text-align:center; flex:1; }
+        .history-stat .num { font-size:24px; font-weight:700; color:#0d6efd; }
+        .history-stat .label { font-size:11px; color:#6c757d; text-transform:uppercase; letter-spacing:.5px; }
+
+        /* Alerts Tab specific */
+        .sev-CRITICAL { background-color: rgba(239, 68, 68, 0.1); color: #dc3545; font-weight: bold; }
+        .sev-HIGH     { background-color: rgba(245, 158, 11, 0.1); color: #fd7e14; font-weight: bold; }
+        .sev-MEDIUM   { background-color: rgba(13, 110, 253, 0.1); color: #0d6efd; font-weight: bold; }
+        .sev-LOW      { background-color: rgba(25, 135, 84, 0.1); color: #198754; font-weight: bold; }
+
+        /* Toast notification */
+        .alert-toast {
+            position:fixed; top:80px; right:20px; z-index:9999;
+            background:#fff; border:1px solid #dee2e6;
+            border-radius:10px; padding:15px; min-width:320px; max-width:400px;
+            display:flex; align-items:flex-start; gap:12px;
+            animation: slideIn .3s ease; box-shadow:0 10px 25px rgba(0,0,0,.1);
+        }
+        .alert-toast.CRITICAL { border-left:4px solid #dc3545; }
+        .alert-toast.HIGH     { border-left:4px solid #fd7e14; }
+        .alert-toast.MEDIUM   { border-left:4px solid #0d6efd; }
+        .alert-toast.LOW      { border-left:4px solid #198754; }
+        .alert-toast .toast-icon { font-size:20px; line-height:1; }
+        .alert-toast .toast-body { flex:1; }
+        .alert-toast .toast-title { font-size:14px; font-weight:700; color:#212529; }
+        .alert-toast .toast-msg   { font-size:12px; color:#6c757d; margin-top:4px; }
+        .alert-toast .toast-close { background:none; border:none; color:#adb5bd; cursor:pointer; font-size:18px; line-height:1; padding:0; }
+        @keyframes slideIn { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes slideOut { from{transform:translateX(0);opacity:1} to{transform:translateX(100%);opacity:0} }
+    </style>
+</head>
+
+<body>
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container-fluid">
+            <span class="navbar-brand mb-0 h1">🛡️ PacketDukjub - User Dashboard</span>
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-light small" id="userDisplay">Role: General User</span>
+                <button class="btn btn-outline-danger btn-sm" onclick="logout()">LOGOUT</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Tab bar -->
+    <div class="user-tabs">
+        <button class="user-tab-btn active" onclick="switchTab('live',this)">📡 Live Monitor</button>
+        <button class="user-tab-btn" onclick="switchTab('history',this)">📋 ประวัติของฉัน</button>
+        <button class="user-tab-btn" onclick="switchTab('alerts',this)">🚨 Security Alerts <span id="alertTabBadge" class="badge bg-danger d-none" style="font-size:10px;margin-left:4px;">0</span></button>
+    </div>
+
+    <!-- ===== TAB 1: LIVE MONITOR ===== -->
+    <div class="user-tab-content active" id="tab-live">
+    <div class="container-fluid mt-3">
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white py-1 d-flex justify-content-between align-items-center">
+                        <span>🔍 Live Filter & Control</span>
+                        <div class="d-flex gap-2" style="width: 450px;">
+                            <select id="selectIface" class="form-select form-select-sm">
+                                <option value="">กำลังโหลด Interface...</option>
+                            </select>
+                            <button id="startBtn" class="btn btn-success btn-sm" style="min-width: 80px;">▶️ Start</button>
+                            <button id="stopBtn" class="btn btn-danger btn-sm d-none" style="min-width: 80px;">⏹️ Stop</button>
+                        </div>
+                    </div>
+                    <div class="card-body py-2">
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <select id="filterProto" class="form-select form-select-sm">
+                                    <option value="">ทุก Protocol</option>
+                                    <option value="TCP">TCP</option><option value="UDP">UDP</option>
+                                    <option value="HTTPS">HTTPS</option><option value="HTTP">HTTP</option>
+                                    <option value="QUIC">QUIC</option><option value="DNS">DNS</option>
+                                    <option value="ICMP">ICMP</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4"><input type="text" id="filterIP" class="form-control form-control-sm" placeholder="ค้นหา IP Address"></div>
+                            <div class="col-md-2"><input type="text" id="filterPort" class="form-control form-control-sm" placeholder="ค้นหา Port"></div>
+                            <div class="col-md-3"><input type="number" id="filterMinSize" class="form-control form-control-sm" placeholder="Min Size (Bytes)"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4"><div class="chart-container"><canvas id="lineChart"></canvas></div></div>
+            <div class="col-md-4"><div class="chart-container"><canvas id="pieChart"></canvas></div></div>
+            <div class="col-md-4"><div class="chart-container"><canvas id="barChart"></canvas></div></div>
+        </div>
+        <div class="row"><div class="col-12">
+            <div class="table-container">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light"><tr>
+                        <th>Time</th><th>Protocol</th><th>Source IP</th><th>Dest IP</th><th>Port</th><th>Size</th><th>Encryption</th><th>TLS Ver.</th><th>Cipher</th><th>Certificate</th>
+                    </tr></thead>
+                    <tbody id="packetTableBody"></tbody>
+                </table>
+            </div>
+        </div></div>
+    </div>
+    </div>
+
+    <!-- ===== TAB 2: HISTORY ===== -->
+    <div class="user-tab-content" id="tab-history">
+    <div class="container-fluid mt-3">
+        <!-- Stats -->
+        <div class="history-stats">
+            <div class="history-stat"><div class="num" id="hStatTotal">0</div><div class="label">Total Packets</div></div>
+            <div class="history-stat"><div class="num" id="hStatEnc" style="color:#198754">0</div><div class="label">Encrypted</div></div>
+            <div class="history-stat"><div class="num" id="hStatPlain" style="color:#dc3545">0</div><div class="label">Plaintext</div></div>
+            <div class="history-stat"><div class="num" id="hStatIPs" style="color:#6f42c1">0</div><div class="label">Unique IPs</div></div>
+        </div>
+        <!-- Controls -->
+        <div class="history-ctrl">
+            <input type="text" id="historySearch" class="form-control form-control-sm" placeholder="🔍 ค้นหา (IP, protocol, cipher...)">
+            <button class="btn-export" onclick="exportCSV()">📄 Export CSV</button>
+            <button class="btn-export" onclick="exportJSON()">{ } Export JSON</button>
+            <button class="btn-export" onclick="if(confirm('ลบประวัติทั้งหมด?')){packetHistory=[];renderHistory()}">🗑 Clear</button>
+            <span class="text-muted small" id="historyCount">0 records</span>
+        </div>
+        <!-- Table -->
+        <div class="table-container" style="max-height:calc(100vh - 340px);">
+            <table class="table table-hover table-sm">
+                <thead class="table-light"><tr>
+                    <th>#</th><th>Time</th><th>Protocol</th><th>Source IP</th><th>Dest IP</th><th>Port</th><th>Size</th><th>Encryption</th><th>TLS</th><th>Cipher</th><th>Certificate</th>
+                </tr></thead>
+                <tbody id="historyTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    </div>
+
+    <!-- ===== TAB 3: SECURITY ALERTS ===== -->
+    <div class="user-tab-content" id="tab-alerts">
+    <div class="container-fluid mt-3">
+        <!-- Stats -->
+        <div class="history-stats">
+            <div class="history-stat"><div class="num text-danger" id="aStatCrit">0</div><div class="label">Critical</div></div>
+            <div class="history-stat"><div class="num text-warning" id="aStatHigh">0</div><div class="label">High</div></div>
+            <div class="history-stat"><div class="num text-primary" id="aStatMed">0</div><div class="label">Medium</div></div>
+            <div class="history-stat"><div class="num text-success" id="aStatAck">0</div><div class="label">Acknowledged</div></div>
+        </div>
+        <!-- Controls -->
+        <div class="history-ctrl">
+            <select id="alertFilterSeverity" class="form-select form-select-sm" style="max-width:150px;" onchange="renderAlerts()">
+                <option value="">All Severities</option>
+                <option value="CRITICAL">🔴 Critical</option>
+                <option value="HIGH">🟠 High</option>
+                <option value="MEDIUM">🟡 Medium</option>
+                <option value="LOW">🔵 Low</option>
+            </select>
+            <select id="alertFilterType" class="form-select form-select-sm" style="max-width:200px;" onchange="renderAlerts()">
+                <option value="">All Types</option>
+                <option value="INSECURE_PROTOCOL">Insecure Protocol</option>
+                <option value="WEAK_TLS">Weak TLS</option>
+                <option value="CERT_EXPIRY">Cert Expiry</option>
+                <option value="PORT_SCAN">Port Scan</option>
+                <option value="BRUTE_FORCE">Brute Force</option>
+                <option value="DOS_ATTEMPT">DoS Attempt</option>
+            </select>
+            <select id="alertFilterAck" class="form-select form-select-sm" style="max-width:150px;" onchange="renderAlerts()">
+                <option value="">All Status</option>
+                <option value="unacked">Unacknowledged</option>
+                <option value="acked">Acknowledged</option>
+            </select>
+            <div class="ms-auto flex-grow-1 text-end">
+                <button class="btn btn-outline-success btn-sm me-2" onclick="ackAllAlerts()">✓ Ack All</button>
+                <span class="text-muted small" id="alertCount">0 alerts</span>
+            </div>
+        </div>
+        <!-- Table -->
+        <div class="table-container" style="max-height:calc(100vh - 340px);">
+            <table class="table table-hover table-sm">
+                <thead class="table-light"><tr>
+                    <th>Time</th><th>Severity</th><th>Type</th><th>Message</th><th>Source</th><th>Details</th><th>Action</th>
+                </tr></thead>
+                <tbody id="alertsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+    </div>
+
+    <div class="modal fade" id="packetModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📦 Packet Detail</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="packetDetailContent" class="p-3 bg-light border" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const url = "http://localhost:3000";
+        axios.defaults.withCredentials = true;
+
+        let myUser = null;
+
+        async function checkRole() {
+            try {
+                const res = await axios.get(`${url}/auth/me`);
+                const user = res.data.user;
+                document.getElementById('userDisplay').textContent = user.username + ' (User)';
+                myUser = { username: user.username, role: user.role };
+                if (socket.connected) socket.emit('identify', myUser);
+            } catch (err) { window.location.href = 'login.html'; }
+        }
+        document.addEventListener('DOMContentLoaded', checkRole);
+        function logout() { axios.post(`${url}/auth/logout`).then(() => window.location.href = 'login.html'); }
+
+        // ===== TAB SWITCHING =====
+        function switchTab(name, btn) {
+            document.querySelectorAll('.user-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.user-tab-content').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+            if (name === 'history') renderHistory();
+            if (name === 'alerts') renderAlerts();
+        }
+
+        // ===== STATE =====
+        const socket = io(url);
+        let isSniffing = false;
+        let packetHistory = [];  // เก็บ packet ทั้งหมดที่รับมา
+        let hEncCount = 0, hPlainCount = 0;
+        let hUniqueIPs = new Set();
+
+        // ===== CHARTS =====
+        const lineChart = new Chart(document.getElementById('lineChart'), { type:'line', data:{ labels:[], datasets:[{ label:'Packets/sec', data:[], borderColor:'#0d6efd', tension:.4 }] }, options:{ animation:false } });
+        const pieChart = new Chart(document.getElementById('pieChart'), { type:'doughnut', data:{ labels:['Encrypted','Plaintext'], datasets:[{ data:[0,0], backgroundColor:['#198754','#dc3545'] }] } });
+        const barChart = new Chart(document.getElementById('barChart'), { type:'bar', data:{ labels:['TCP','UDP','ICMP','DNS','HTTP','HTTPS','QUIC'], datasets:[{ label:'Counts', data:[0,0,0,0,0,0,0], backgroundColor:'#6c757d' }] } });
+        let packetCountInSecond = 0;
+
+        function getProtoIndex(proto) {
+            if(proto.includes('QUIC'))return 6; if(proto.includes('HTTPS'))return 5;
+            if(proto.includes('HTTP'))return 4; if(proto.includes('DNS'))return 3;
+            if(proto.includes('ICMP'))return 2; if(proto.includes('UDP'))return 1;
+            if(proto.includes('TCP'))return 0; return -1;
+        }
+
+        // ===== SOCKET =====
+        socket.on('connect', () => {
+            socket.emit('request_interfaces');
+            // ★ ส่ง identify ทุกครั้งที่ connect/reconnect
+            if (myUser) socket.emit('identify', myUser);
+        });
+
+        socket.on('available_interfaces', (list) => {
+            const sel = document.getElementById('selectIface'); sel.innerHTML = '';
+            list.forEach(i => {
+                const o = document.createElement('option'); o.value = i.name; o.textContent = i.description;
+                if (i.description.toLowerCase().includes('wi-fi')) o.selected = true;
+                sel.appendChild(o);
+            });
+        });
+
+        // ===== LIVE PACKETS =====
+        socket.on('update_dashboard', (data) => {
+            if (!isSniffing) return;
+
+            // เก็บลงประวัติเสมอ (ก่อน filter)
+            data._time = new Date().toLocaleTimeString();
+            const isEnc = data.encryption && data.encryption.includes('Encrypted');
+            packetHistory.push(data);
+            hUniqueIPs.add(data.src); hUniqueIPs.add(data.dst);
+            if (isEnc) hEncCount++; else hPlainCount++;
+
+            // Live filter
+            const fp = document.getElementById('filterProto').value;
+            const fi = document.getElementById('filterIP').value;
+            const fport = document.getElementById('filterPort').value;
+            const fsize = document.getElementById('filterMinSize').value;
+            if (fp && !data.protocol.includes(fp)) return;
+            if (fi && !data.src.includes(fi) && !data.dst.includes(fi)) return;
+            if (fport && data.port.toString() !== fport) return;
+            if (fsize && data.size < parseInt(fsize)) return;
+
+            // Add to live table
+            const tbody = document.getElementById('packetTableBody');
+            const row = tbody.insertRow(0);
+            row.onclick = () => showDetail(data);
+            const tlsVer = data.tls_version || 'N/A';
+            const cipher = data.cipher && data.cipher !== 'N/A' ? data.cipher : '-';
+            const cert = data.cert && data.cert !== 'N/A' ? data.cert : '-';
+            const hasAlert = data.alerts && data.alerts.length > 0;
+            if (hasAlert) row.classList.add('table-danger');
+            const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
+            
+            row.innerHTML = `
+                <td>${data._time}</td>
+                <td><span class="badge ${isEnc?'bg-success':'bg-secondary'}">${alertIcon}${data.protocol}</span></td>
+                <td>${data.src}</td><td>${data.dst}</td>
+                <td><b class="text-primary">${data.port||'-'}</b></td>
+                <td>${data.size}</td>
+                <td class="${isEnc?'status-encrypted':'status-plaintext'}">${data.encryption}</td>
+                <td><small class="text-info fw-bold">${tlsVer}</small></td>
+                <td><small>${cipher}</small></td>
+                <td><small>${cert}</small></td>
+            `;
+            if (tbody.rows.length > 50) tbody.deleteRow(50);
+
+            packetCountInSecond++;
+            if (isEnc) pieChart.data.datasets[0].data[0]++; else pieChart.data.datasets[0].data[1]++;
+            pieChart.update('none');
+            const idx = getProtoIndex(data.protocol);
+            if (idx >= 0) { barChart.data.datasets[0].data[idx]++; barChart.update('none'); }
+        });
+
+        // ===== CONTROLS =====
+        document.getElementById('startBtn').addEventListener('click', () => {
+            socket.emit('control_sniffer', { action:'start', iface:document.getElementById('selectIface').value });
+            isSniffing = true;
+            document.getElementById('startBtn').classList.add('d-none');
+            document.getElementById('stopBtn').classList.remove('d-none');
+        });
+        document.getElementById('stopBtn').addEventListener('click', () => {
+            socket.emit('control_sniffer', { action:'stop' });
+            isSniffing = false;
+            document.getElementById('startBtn').classList.remove('d-none');
+            document.getElementById('stopBtn').classList.add('d-none');
+        });
+        document.getElementById('selectIface').addEventListener('change', () => {
+            socket.emit('control_sniffer', { action:'stop' });
+            isSniffing = false;
+            document.getElementById('startBtn').classList.remove('d-none');
+            document.getElementById('stopBtn').classList.add('d-none');
+        });
+
+        function applyLiveFilter() {
+            const fp = document.getElementById('filterProto').value;
+            const fi = document.getElementById('filterIP').value;
+            const fport = document.getElementById('filterPort').value;
+            const fsize = document.getElementById('filterMinSize').value;
+            document.querySelectorAll('#packetTableBody tr').forEach(row => {
+                let show = true;
+                if (fp && !row.cells[1].innerText.includes(fp)) show = false;
+                if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
+                if (fport && row.cells[4].innerText !== fport) show = false;
+                if (fsize && parseInt(row.cells[5].innerText) < parseInt(fsize)) show = false;
+                row.style.display = show ? '' : 'none';
+            });
+        }
+        ['filterProto','filterIP','filterPort','filterMinSize'].forEach(id =>
+            document.getElementById(id).addEventListener('input', applyLiveFilter)
+        );
+
+        setInterval(() => {
+            const now = new Date().toLocaleTimeString();
+            lineChart.data.labels.push(now);
+            lineChart.data.datasets[0].data.push(packetCountInSecond);
+            if (lineChart.data.labels.length > 15) { lineChart.data.labels.shift(); lineChart.data.datasets[0].data.shift(); }
+            lineChart.update();
+            packetCountInSecond = 0;
+        }, 1000);
+
+        // ===== PACKET DETAIL MODAL =====
+        function showDetail(data) {
+            let detail = JSON.stringify(data, null, 2);
+            if (data.cert_issuer || data.cert_subject) {
+                detail += '\n\n=== 📜 Certificate Details ===\n';
+                detail += 'Subject: ' + (data.cert_subject||'N/A') + '\n';
+                detail += 'Issuer:  ' + (data.cert_issuer||'N/A') + '\n';
+                detail += 'Valid:   ' + (data.cert_not_before||'?') + ' ~ ' + (data.cert_not_after||'?') + '\n';
+                detail += 'SAN:     ' + (data.cert_san||'N/A') + '\n';
+            }
+            document.getElementById('packetDetailContent').innerText = detail;
+            new bootstrap.Modal(document.getElementById('packetModal')).show();
+        }
+
+        // ===== HISTORY TAB =====
+        function renderHistory() {
+            const q = document.getElementById('historySearch').value.toLowerCase();
+            const filtered = q ? packetHistory.filter(p =>
+                (p.protocol+p.src+p.dst+p.port+(p.cipher||'')+(p.tls_version||'')+(p.cert||'')).toLowerCase().includes(q)
+            ) : packetHistory;
+
+            // Update stats
+            document.getElementById('hStatTotal').textContent = packetHistory.length;
+            document.getElementById('hStatEnc').textContent = hEncCount;
+            document.getElementById('hStatPlain').textContent = hPlainCount;
+            document.getElementById('hStatIPs').textContent = hUniqueIPs.size;
+            document.getElementById('historyCount').textContent = filtered.length + ' records';
+
+            // Render table (last 500, newest first)
+            const tbody = document.getElementById('historyTableBody');
+            tbody.innerHTML = '';
+            const slice = filtered.slice(-500).reverse();
+            slice.forEach((d, i) => {
+                const row = tbody.insertRow();
+                row.onclick = () => showDetail(d);
+                const isEnc = d.encryption && d.encryption.includes('Encrypted');
+                const hasAlert = d.alerts && d.alerts.length > 0;
+                if (hasAlert) row.classList.add('table-danger');
+                const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
+                
+                row.innerHTML = `
+                    <td class="text-muted">${filtered.length - i}</td>
+                    <td>${d._time||'—'}</td>
+                    <td><span class="badge ${isEnc?'bg-success':'bg-secondary'}">${alertIcon}${d.protocol}</span></td>
+                    <td>${d.src}</td><td>${d.dst}</td>
+                    <td class="text-primary fw-bold">${d.port||'-'}</td>
+                    <td>${d.size}B</td>
+                    <td class="${isEnc?'status-encrypted':'status-plaintext'}">${d.encryption||'-'}</td>
+                    <td><small class="text-info fw-bold">${d.tls_version||'-'}</small></td>
+                    <td><small>${d.cipher&&d.cipher!=='N/A'?d.cipher:'-'}</small></td>
+                    <td><small>${d.cert&&d.cert!=='N/A'?d.cert:'-'}</small></td>
+                `;
+            });
+        }
+        document.getElementById('historySearch').addEventListener('input', renderHistory);
+
+        // ===== EXPORT =====
+        function exportCSV() {
+            if (!packetHistory.length) return alert('ยังไม่มีข้อมูลให้ export');
+            const h = ['Time','Protocol','Source','Destination','Port','Size','Encryption','TLS','Cipher','Certificate'];
+            const rows = packetHistory.map(d => [
+                d._time||'', d.protocol||'', d.src||'', d.dst||'', d.port||'', d.size||'',
+                d.encryption||'', d.tls_version||'', (d.cipher||'').replace(/,/g,';'), (d.cert||'').replace(/,/g,';')
+            ]);
+            const csv = h.join(',') + '\n' + rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+            downloadFile(csv, 'my_packets.csv', 'text/csv');
+        }
+        function exportJSON() {
+            if (!packetHistory.length) return alert('ยังไม่มีข้อมูลให้ export');
+            const clean = packetHistory.map(d => ({
+                time:d._time, protocol:d.protocol, src:d.src, dst:d.dst, port:d.port, size:d.size,
+                encryption:d.encryption, tls_version:d.tls_version, cipher:d.cipher, cert:d.cert
+            }));
+            downloadFile(JSON.stringify(clean,null,2), 'my_packets.json', 'application/json');
+        }
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = filename; a.click(); URL.revokeObjectURL(a.href);
+        }
+
+        // ===== ALERT SYSTEM =====
+        let allAlerts = [];
+        let unackedCount = 0;
+        const SEVERITY_ICON = { CRITICAL:'🔴', HIGH:'🟠', MEDIUM:'🟡', LOW:'🔵' };
+        const TYPE_LABEL = {
+            INSECURE_PROTOCOL: '🔓 Insecure Protocol',
+            WEAK_TLS:          '🔐 Weak TLS',
+            CERT_EXPIRY:       '📜 Cert Expiry',
+            PORT_SCAN:         '🔍 Port Scan',
+            BRUTE_FORCE:       '💥 Brute Force',
+            DOS_ATTEMPT:       '🌊 DoS Attempt',
+        };
+
+        socket.on('new_alert', (alert) => {
+            allAlerts.unshift(alert);
+            if (!alert.acknowledged) unackedCount++;
+            updateAlertStats();
+            showToast(alert);
+            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
+        });
+
+        socket.on('alert_acknowledged', (alertId) => {
+            const a = allAlerts.find(x => x.id === alertId);
+            if (a && !a.acknowledged) { a.acknowledged = true; unackedCount = Math.max(0, unackedCount - 1); }
+            updateAlertStats();
+            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
+        });
+
+        socket.on('alert_history', (alerts) => {
+            allAlerts = alerts;
+            unackedCount = alerts.filter(a => !a.acknowledged).length;
+            updateAlertStats();
+            renderAlerts();
+        });
+        socket.emit('request_alerts'); // initial fetch
+
+        function updateAlertStats() {
+            const crit  = allAlerts.filter(a => a.severity === 'CRITICAL').length;
+            const high  = allAlerts.filter(a => a.severity === 'HIGH').length;
+            const med   = allAlerts.filter(a => a.severity === 'MEDIUM').length;
+            const acked = allAlerts.filter(a => a.acknowledged).length;
+            document.getElementById('aStatCrit').textContent  = crit;
+            document.getElementById('aStatHigh').textContent  = high;
+            document.getElementById('aStatMed').textContent   = med;
+            document.getElementById('aStatAck').textContent   = acked;
+            
+            const badge = document.getElementById('alertTabBadge');
+            if (unackedCount > 0) {
+                badge.textContent = unackedCount > 99 ? '99+' : unackedCount;
+                badge.classList.remove('d-none');
+            } else {
+                badge.classList.add('d-none');
+            }
+        }
+
+        function renderAlerts() {
+            const sevFilter  = document.getElementById('alertFilterSeverity').value;
+            const typeFilter = document.getElementById('alertFilterType').value;
+            const ackFilter  = document.getElementById('alertFilterAck').value;
+            let filtered = allAlerts;
+            if (sevFilter)  filtered = filtered.filter(a => a.severity === sevFilter);
+            if (typeFilter) filtered = filtered.filter(a => a.type === typeFilter);
+            if (ackFilter === 'unacked') filtered = filtered.filter(a => !a.acknowledged);
+            if (ackFilter === 'acked')   filtered = filtered.filter(a => a.acknowledged);
+
+            document.getElementById('alertCount').textContent = filtered.length + ' alerts';
+            const tbody = document.getElementById('alertsTableBody');
+            tbody.innerHTML = '';
+
+            filtered.forEach(a => {
+                const row = tbody.insertRow();
+                if (a.acknowledged) row.style.opacity = '0.45';
+                const det = a.details || {};
+                const detStr = Object.entries(det).map(([k,v]) => `${k}: ${Array.isArray(v)?v.join(', '):v}`).join(' | ');
+                row.innerHTML = `
+                    <td class="text-muted small">${a._time}</td>
+                    <td><span class="badge sev-${a.severity}">${SEVERITY_ICON[a.severity]} ${a.severity}</span></td>
+                    <td style="font-size:12px;">${TYPE_LABEL[a.type]||a.type}</td>
+                    <td style="font-size:13px;">${a.message}</td>
+                    <td style="font-size:12px; color:#0d6efd;">${det.src||'—'}</td>
+                    <td style="font-size:11px; color:#6c757d; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${detStr}">${detStr}</td>
+                    <td>${a.acknowledged
+                        ? '<span class="text-success" style="font-size:11px;">✓ Acked</span>'
+                        : `<button class="btn btn-outline-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="ackAlert('${a.id}')">Ack</button>`
+                    }</td>
+                `;
+            });
+        }
+
+        function ackAlert(id) { socket.emit('acknowledge_alert', id); }
+        function ackAllAlerts() { allAlerts.filter(a => !a.acknowledged).forEach(a => socket.emit('acknowledge_alert', a.id)); }
+
+        let toastQueue = [];
+        let toastShowing = false;
+        function showToast(alert) {
+            toastQueue.push(alert);
+            if (!toastShowing) processToastQueue();
+        }
+        function processToastQueue() {
+            if (!toastQueue.length) { toastShowing = false; return; }
+            toastShowing = true;
+            const a = toastQueue.shift();
+            const toast = document.createElement('div');
+            toast.className = `alert-toast ${a.severity}`;
+            toast.innerHTML = `
+                <div class="toast-icon">${SEVERITY_ICON[a.severity]}</div>
+                <div class="toast-body">
+                    <div class="toast-title">${TYPE_LABEL[a.type]||a.type} — ${a.severity}</div>
+                    <div class="toast-msg">${a.message}</div>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.remove();processToastQueue()">×</button>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                toast.style.animation = 'slideOut .3s ease forwards';
+                setTimeout(() => { toast.remove(); processToastQueue(); }, 300);
+            }, 5000);
+        }
+    </script>
+</body>
+
+</html>

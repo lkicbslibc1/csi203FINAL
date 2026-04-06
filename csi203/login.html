@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Packet Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+</head>
+<style>
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+        font-family: 'Segoe UI', sans-serif;
+    }
+
+    body {
+        background-color: #0f172a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        color: #f8fafc;
+    }
+
+    .auth-box {
+        background-color: #1e293b;
+        padding: 40px;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        text-align: center;
+        border: 1px solid #facc15;
+        width: 400px;
+    }
+
+    h2 span {
+        color: #facc15;
+        text-shadow: 0 0 10px rgba(250, 204, 21, 0.3);
+    }
+
+    p {
+        color: #94a3b8;
+        font-size: 14px;
+        margin-bottom: 25px;
+    }
+
+    .input-group {
+        text-align: left;
+        margin-bottom: 15px;
+    }
+
+    .input-group label {
+        display: block;
+        margin-bottom: 5px;
+        color: #fde68a;
+        font-size: 13px;
+    }
+
+    .input-group input,
+    .input-group select {
+        width: 100%;
+        padding: 12px;
+        border-radius: 6px;
+        border: 1px solid #334155;
+        background-color: #0f172a;
+        color: white;
+        outline: none;
+    }
+
+    /* ปรับแต่ง Dropdown สีเหลือง */
+    .input-group select option {
+        background: #1e293b;
+        color: white;
+    }
+
+    .input-group input:focus,
+    .input-group select:focus {
+        border-color: #facc15;
+    }
+
+    .auth-btn {
+        width: 100%;
+        padding: 12px;
+        border: none;
+        border-radius: 6px;
+        background-color: #facc15;
+        color: #0f172a;
+        font-weight: bold;
+        cursor: pointer;
+        transition: 0.3s;
+        margin-top: 10px;
+        text-transform: uppercase;
+    }
+
+    .auth-btn:hover {
+        background-color: #eab308;
+        transform: translateY(-2px);
+    }
+
+    .footer-links {
+        margin-top: 20px;
+        font-size: 13px;
+    }
+
+    .footer-links a {
+        color: #facc15;
+        text-decoration: none;
+        font-weight: bold;
+    }
+</style>
+
+<body>
+    <div class="auth-container">
+        <div class="auth-box" id="loginBox">
+            <h2>Packet<span>Dukjub</span></h2>
+            <p>เข้าสู่ระบบเพื่อเริ่มดักจับแพ็กเก็ต</p>
+            <form id="loginForm">
+                <div class="input-group">
+                    <label>ชื่อผู้ใช้งาน</label>
+                    <input type="text" placeholder="Username" required>
+                </div>
+                <div class="input-group">
+                    <label>รหัสผ่าน</label>
+                    <input type="password" placeholder="Password" required>
+                </div>
+                <button type="submit" class="auth-btn" onclick="Login(event)">Sign In</button>
+            </form>
+            <div class="footer-links">
+                <p>ยังไม่มีบัญชี? <a href="#" onclick="toggleAuth()">ลงทะเบียนใหม่</a></p>
+            </div>
+        </div>
+
+        <div class="auth-box" id="registerBox" style="display: none;">
+            <h2>Create<span>Account</span></h2>
+            <p>สร้างบัญชีใหม่เพื่อเข้าใช้งานระบบ</p>
+            <form id="registerForm">
+                <div class="input-group">
+                    <label>ชื่อผู้ใช้งาน</label>
+                    <input type="text" placeholder="Username" id="registerName" required>
+                </div>
+                <div class="input-group">
+                    <label>รหัสผ่าน</label>
+                    <input type="password" placeholder="Password" id="registerPassword" required>
+                </div>
+                <div class="input-group">
+                    <label>ยืนยันรหัสผ่าน</label>
+                    <input type="password" placeholder="Confim Password" id="registerConfirmPassword" required>
+                </div>
+                <label style="color: red; display: none;" id="redText">รหัสผ่านไม่ตรงกัน</label>
+                <button type="submit" class="auth-btn" onclick="Register(event)">Register</button>
+            </form>
+            <div class="footer-links">
+                <p>มีบัญชีอยู่แล้ว? <a href="#" onclick="toggleAuth()">เข้าสู่ระบบ</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const url = "http://localhost:3000"
+        axios.defaults.withCredentials = true;
+        function toggleAuth() {
+            const loginBox = document.getElementById('loginBox');
+            const registerBox = document.getElementById('registerBox');
+
+            if (loginBox.style.display === 'none') {
+                loginBox.style.display = 'block';
+                registerBox.style.display = 'none';
+            } else {
+                loginBox.style.display = 'none';
+                registerBox.style.display = 'block';
+            }
+        }
+        function Login(event) {
+            event.preventDefault();
+            const username = document.querySelector('#loginForm input[type="text"]').value;
+            const password = document.querySelector('#loginForm input[type="password"]').value;
+
+            axios.post(`${url}/auth/login`, { username, password })
+                .then((res) => {
+                    alert("Loginสำเร็จ Browser เก็บCookieแล้ว");
+                    console.log(res)
+                    checkRole()
+                    document.getElementById('loginForm').reset();
+                })
+                .catch(err => alert(err.response.data.message));
+        }
+        function Register(event) {
+            event.preventDefault();
+            const username = document.getElementById('registerName').value;
+            const password = document.getElementById('registerPassword').value;
+            const confirmPassword = document.getElementById('registerConfirmPassword').value;
+            const redText = document.getElementById("redText")
+            if (password != confirmPassword) {
+                redText.style.display = 'block';
+                return
+            }
+            axios.post(`${url}/auth/register`, { username, password })
+                .then((res) => {
+                    alert("register successful")
+                    console.log(res)
+                    toggleAuth(); 
+                    document.getElementById('registerForm').reset();
+                })
+                .catch((err) => { console.log(err) })
+        }
+
+        async function checkRole() {
+            
+            axios.get(`${url}/auth/me`)
+                .then((res) => {
+                    console.log(res.data.user)
+                    if (res.data.user.role == "admin"){
+                         window.location.href = 'admin.html';
+                    }
+                    else{
+                        window.location.href = 'user.html';
+                    }
+                })
+                .catch(err =>
+                        console.error("ไม่ได้ล็อกอิน หรือเซสชันหมดอายุ")
+                );
+        }
+        document.addEventListener('DOMContentLoaded', checkRole);
+    </script>
+</body>
+
+</html>
