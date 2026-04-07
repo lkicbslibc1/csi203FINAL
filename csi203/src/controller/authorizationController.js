@@ -1,32 +1,31 @@
-// ไฟล์นี้ต้องเปลี่ยนจาก json ไปเป็น mysql
-import fs from 'fs/promises';
-import path from 'path';
 import bcrypt from 'bcryptjs';
-import 'dotenv/config'; 
-import jwt from 'jsonwebtoken'
-/////// authorizationController
-const SECRET_KEY = process.env.JWT_SECRET; 
-const DATA_PATH = path.join(process.cwd(), 'users.json')
+import 'dotenv/config';
+import jwt from 'jsonwebtoken';
+import mysql from 'mysql2/promise';
+
+const SECRET_KEY = process.env.JWT_SECRET;
+
+export const pool = mysql.createPool({
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'sniffer_db',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+});
 
 export const getUsers = async () => {
     try {
-        const data = await fs.readFile(DATA_PATH, 'utf-8');
-        return JSON.parse(data);
+        const [rows] = await pool.query('SELECT * FROM users');
+        return rows;
     } catch { return []; }
 };
 
 export const createUser = async (username, password) => {
-    const users = await getUsers();
-    const hashedPassword = await bcrypt.hash(password, 10)
-    const newUser = {
-        username,
-        password: hashedPassword,
-        role: 'user',
-        createdAt: new Date()
-    }
-    users.push(newUser)
-    await fs.writeFile(DATA_PATH, JSON.stringify(users, null, 2))
-}
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query('INSERT INTO users (username, password, role) VALUES (?, ?, ?)', [username, hashedPassword, 'user']);
+};
 
 export const verifyToken = (req, res, next) => {
     const token = req.cookies?.token;
@@ -37,11 +36,9 @@ export const verifyToken = (req, res, next) => {
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
         req.user = decoded;
-        console.log(req.user)
+        console.log(req.user);
         next();
     } catch (err) {
         return res.status(403).json({ message: "Token ไม่ถูกต้องหรือหมดอายุ" });
     }
 };
-
-

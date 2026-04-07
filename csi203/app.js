@@ -9,7 +9,22 @@ import http from "http";
 import jwt from 'jsonwebtoken';
 import 'dotenv/config';
 import os from 'os';
+import mysql from 'mysql2';
 
+const db = mysql.createConnection({
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'sniffer_db'
+});
+
+db.connect((err) => {
+    if (err) {
+        console.error('❌ ต่อ MySQL ไม่ได้ ไปสั่ง docker-compose up -d', err);
+    } else {
+        console.log('✅ MySQL Connected! ท่อพร้อมใช้งาน!');
+    }
+});
 const host = 'localhost'
 const port = 3000
 const SECRET_KEY = process.env.JWT_SECRET;
@@ -315,8 +330,21 @@ io.on('connection', (socket) => {
 
         pkt._user = mappedUser;
         analyzePacketForAlerts(pkt);
+
+        const sql = `INSERT INTO packets (username, protocol, src, dst, port, size, encryption, cipher, cert, tls_version, handshake_type, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const values = [
+            pkt._user, // 🎯 ยัดค่าชื่อ User (ที่หาเจอจาก IP) ลงไปใน DB ด้วย!
+            pkt.protocol, pkt.src, pkt.dst, pkt.port, pkt.size,
+            pkt.encryption, pkt.cipher, pkt.cert, pkt.tls_version,
+            pkt.handshake_type, pkt.payload
+        ];
+        db.query(sql, values, (err, result) => {
+            if (err) console.error("❌Insert ไม่เข้า:", err);
+        });
+
         io.emit('update_dashboard', pkt);
     });
+
     socket.on('acknowledge_alert', (alertId) => {
         const alert = alertHistory.find(a => a.id === alertId);
         if (alert) {
@@ -328,8 +356,6 @@ io.on('connection', (socket) => {
     socket.on('network_stats', (stats) => {
         io.emit('network_stats', stats);
     });
-
-
 });
 
 // --- Routes ---
@@ -344,6 +370,14 @@ app.put('/alerts/thresholds', (req, res) => {
     if (bruteForceCount) ALERT_THRESHOLDS.bruteForceCount = bruteForceCount;
     if (certExpiryWarningDays) ALERT_THRESHOLDS.certExpiryWarningDays = certExpiryWarningDays;
     res.json({ success: true, thresholds: ALERT_THRESHOLDS });
+});
+app.get('/api/history', verifyToken, (req, res) => {
+    const loggedInUser = req.user.username;
+    const sql = 'SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500';
+    db.query(sql, [loggedInUser], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
 });
 server.listen(port, host, () => {
     console.log(`🚀 Server running on http://${host}:${port}`);

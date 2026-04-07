@@ -1,34 +1,31 @@
-import { Router } from 'express'
-import { createUser, getUsers } from '../controller/authorizationController.js'
-import fs from 'fs/promises';
-import path from 'path';
+import { Router } from 'express';
+import { createUser, getUsers, verifyToken, pool } from '../controller/authorizationController.js';
 import 'dotenv/config'; 
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken'
-import { verifyToken } from '../controller/authorizationController.js';
-////// authorizationROuter
-const SECRET_KEY = process.env.JWT_SECRET; 
-const authorization = Router()
+import jwt from 'jsonwebtoken';
 
+const SECRET_KEY = process.env.JWT_SECRET; 
+const authorization = Router();
 
 authorization.post("/register", async (req, res) => {
-    const { username, password } = req.body
+    const { username, password } = req.body;
     try {
-        const users = await getUsers()
-        const userExists = await users.find(u => u.username === username)
+        const users = await getUsers();
+        const userExists = users.find(u => u.username === username);
         if (userExists) {
-            return res.status(400).json({ message: "ชื่อผู้ใช้งานนี้มีคนใช้แล้ว" })
+            return res.status(400).json({ message: "ชื่อผู้ใช้งานนี้มีคนใช้แล้ว" });
         }
-        await createUser(username, password)
-        return res.status(200).json({ message: 'success' })
+        await createUser(username, password);
+        return res.status(200).json({ message: 'success' });
     } catch (error) {
         console.error("DATABASE ERROR:", error);
         return res.status(500).json({
             message: 'Internal Server Error',
             error: error.message
-        })
+        });
     }
-})
+});
+
 authorization.post("/login", async(req, res) => {
     const { username, password } = req.body;
     const users = await getUsers();
@@ -54,7 +51,7 @@ authorization.post("/login", async(req, res) => {
         message: 'Login success',
         role: user.role 
     });
-})
+});
 
 authorization.get("/me", verifyToken, async(req,res)=>{
     if (!req.user) {
@@ -68,6 +65,7 @@ authorization.get("/me", verifyToken, async(req,res)=>{
         }
     });
 });
+
 authorization.post("/logout", async(req,res) => {
     res.clearCookie('token', {
         httpOnly: true,
@@ -75,7 +73,7 @@ authorization.post("/logout", async(req,res) => {
         secure: false
     });
     return res.status(200).json({ message: "Logout successful" });
-})
+});
 
 // === Admin APIs ===
 const requireAdmin = (req, res, next) => {
@@ -92,22 +90,18 @@ authorization.get("/users", verifyToken, requireAdmin, async (req, res) => {
 authorization.put("/users/:username/role", verifyToken, requireAdmin, async (req, res) => {
     const { role } = req.body;
     if (!['admin','user'].includes(role)) return res.status(400).json({ message: 'Invalid role' });
-    const users = await getUsers();
-    const user = users.find(u => u.username === req.params.username);
-    if (!user) return res.status(404).json({ message: 'User not found' });
-    user.role = role;
-    await fs.writeFile(path.join(process.cwd(), 'users.json'), JSON.stringify(users, null, 2));
+    
+    await pool.query('UPDATE users SET role = ? WHERE username = ?', [role, req.params.username]);
     res.json({ message: 'Role updated' });
 });
 
 authorization.delete("/users/:username", verifyToken, requireAdmin, async (req, res) => {
-    let users = await getUsers();
     if (req.params.username === req.user.username) return res.status(400).json({ message: 'Cannot delete yourself' });
-    const before = users.length;
-    users = users.filter(u => u.username !== req.params.username);
-    if (users.length === before) return res.status(404).json({ message: 'User not found' });
-    await fs.writeFile(path.join(process.cwd(), 'users.json'), JSON.stringify(users, null, 2));
+    
+    const [result] = await pool.query('DELETE FROM users WHERE username = ?', [req.params.username]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'User not found' });
+    
     res.json({ message: 'User deleted' });
 });
 
-export default authorization
+export default authorization;

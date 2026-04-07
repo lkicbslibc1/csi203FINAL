@@ -967,6 +967,25 @@
             } catch { window.location.href = 'login.html'; }
         }
         document.addEventListener('DOMContentLoaded', () => { checkRole(); loadUsers(); });
+
+        function loadPacketHistory() {
+            axios.get(`${url}/api/history`)
+                .then(res => {
+                    packetHistory = res.data;
+                    hEncCount = packetHistory.filter(p => p.encryption && p.encryption.includes('Encrypted')).length;
+                    hPlainCount = packetHistory.length - hEncCount;
+                    packetHistory.forEach(p => { hUniqueIPs.add(p.src); hUniqueIPs.add(p.dst); });
+
+                    renderHistory();
+                })
+                .catch(err => console.error("โหลดประวัติพัง!", err));
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkRole();
+            loadPacketHistory();
+        });
+
         function logout() { axios.post(`${url}/auth/logout`).then(() => window.location.href = 'login.html'); }
 
         // ========== TABS ==========
