@@ -1237,7 +1237,8 @@
             );
             document.getElementById('historyCount').textContent = filtered.length + ' records';
 
-            const slice = filtered.slice(-500).reverse();
+            // const slice = filtered.slice(-500).reverse();
+            const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);
@@ -1263,7 +1264,30 @@
         }
         document.getElementById('historySearch').addEventListener('input', renderHistory);
         document.getElementById('historyUserFilter').addEventListener('change', renderHistory);
-        function clearHistory() { if (confirm('Clear all history?')) { packetHistory = []; renderHistory(); } }
+        function clearHistory() {
+            if (confirm('ท่านแอดมินแน่ใจนะว่าจะล้างประวัติของ "ทุกคน" ทั้งเซิร์ฟเวอร์? หายเกลี้ยงเลยนะเว้ย!')) {
+
+                axios.delete(`${url}/api/packets/all`)
+                    .then(res => {
+                        packetHistory = [];
+                        uniqueIPs.clear();
+                        totalPkts = 0;
+                        encCount = 0;
+                        plainCount = 0;
+
+                        renderHistory();
+
+                        document.getElementById('statTotal').textContent = 0;
+                        document.getElementById('statEnc').textContent = 0;
+                        document.getElementById('statPlain').textContent = 0;
+                        document.getElementById('statIPs').textContent = 0;
+
+                        pieChart.data.datasets[0].data = [0, 0];
+                        pieChart.update('none');
+                    })
+                    .catch(err => console.error("❌ ลบประวัติไม่สำเร็จ!", err));
+            }
+        }
 
         // ========== USERS ==========
         async function loadUsers() {

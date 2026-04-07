@@ -372,13 +372,18 @@ app.put('/alerts/thresholds', (req, res) => {
     res.json({ success: true, thresholds: ALERT_THRESHOLDS });
 });
 app.get('/api/history', verifyToken, (req, res) => {
-    const loggedInUser = req.user.username;
-    const sql = 'SELECT * FROM packets WHERE username = ? ORDER BY id DESC';
-    // const sql = 'SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500';
-    db.query(sql, [loggedInUser], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json(results);
-    });
+    if (req.user.role === 'admin') {
+        db.query('SELECT * FROM packets ORDER BY id DESC', (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(results);
+        });
+    } else {
+        const loggedInUser = req.user.username;
+        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500', [loggedInUser], (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(results);
+        });
+    }
 });
 app.get('/api/packets/count', (req, res) => {
     db.query('SELECT COUNT(*) as total FROM packets', (err, results) => {
@@ -394,6 +399,16 @@ app.delete('/api/packets/me', verifyToken, (req, res) => {
     db.query(sql, [loggedInUser], (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true, deletedCount: result.affectedRows });
+    });
+});
+app.delete('/api/packets/all', verifyToken, (req, res) => {
+    if (req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'มึงไม่ใช่แอดมิน อย่ามาซ่า!' });
+    }
+
+    db.query('DELETE FROM packets', (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, message: 'ล้างโกดังเรียบร้อย!' });
     });
 });
 server.listen(port, host, () => {
