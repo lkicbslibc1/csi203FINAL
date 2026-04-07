@@ -332,9 +332,11 @@ io.on('connection', (socket) => {
         analyzePacketForAlerts(pkt);
 
         const sql = `INSERT INTO packets (username, protocol, src, dst, port, size, encryption, cipher, cert, tls_version, handshake_type, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const safePort = (pkt.port === '-' || isNaN(pkt.port)) ? 0 : pkt.port;
+
         const values = [
-            pkt._user, // 🎯 ยัดค่าชื่อ User (ที่หาเจอจาก IP) ลงไปใน DB ด้วย!
-            pkt.protocol, pkt.src, pkt.dst, pkt.port, pkt.size,
+            pkt._user, 
+            pkt.protocol, pkt.src, pkt.dst, safePort, pkt.size,
             pkt.encryption, pkt.cipher, pkt.cert, pkt.tls_version,
             pkt.handshake_type, pkt.payload
         ];
@@ -379,7 +381,7 @@ app.get('/api/history', verifyToken, (req, res) => {
         });
     } else {
         const loggedInUser = req.user.username;
-        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500', [loggedInUser], (err, results) => {
+        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC', [loggedInUser], (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });
