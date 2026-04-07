@@ -375,13 +375,13 @@ app.put('/alerts/thresholds', (req, res) => {
 });
 app.get('/api/history', verifyToken, (req, res) => {
     if (req.user.role === 'admin') {
-        db.query('SELECT * FROM packets ORDER BY id DESC', (err, results) => {
+        db.query('SELECT * FROM packets ORDER BY id DESC LIMIT 500', (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });
     } else {
         const loggedInUser = req.user.username;
-        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC', [loggedInUser], (err, results) => {
+        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500', [loggedInUser], (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });

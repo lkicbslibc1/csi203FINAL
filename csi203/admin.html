@@ -1237,8 +1237,8 @@
             );
             document.getElementById('historyCount').textContent = filtered.length + ' records';
 
-            // const slice = filtered.slice(-500).reverse();
-            const slice = filtered.reverse();
+            const slice = filtered.slice(-500).reverse();
+            // const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);

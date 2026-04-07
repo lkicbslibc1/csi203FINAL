@@ -722,8 +722,8 @@
             // Render table (last 500, newest first)
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
-            // const slice = filtered.slice(-500).reverse();
-            const slice = filtered.reverse();
+            const slice = filtered.slice(-500).reverse();
+            // const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);
