@@ -373,10 +373,27 @@ app.put('/alerts/thresholds', (req, res) => {
 });
 app.get('/api/history', verifyToken, (req, res) => {
     const loggedInUser = req.user.username;
-    const sql = 'SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500';
+    const sql = 'SELECT * FROM packets WHERE username = ? ORDER BY id DESC';
+    // const sql = 'SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500';
     db.query(sql, [loggedInUser], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
+    });
+});
+app.get('/api/packets/count', (req, res) => {
+    db.query('SELECT COUNT(*) as total FROM packets', (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ total: results[0].total });
+    });
+});
+app.delete('/api/packets/me', verifyToken, (req, res) => {
+    const loggedInUser = req.user.username;
+
+    const sql = 'DELETE FROM packets WHERE username = ?';
+
+    db.query(sql, [loggedInUser], (err, result) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, deletedCount: result.affectedRows });
     });
 });
 server.listen(port, host, () => {

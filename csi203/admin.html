@@ -966,23 +966,30 @@
                 }
             } catch { window.location.href = 'login.html'; }
         }
-        document.addEventListener('DOMContentLoaded', () => { checkRole(); loadUsers(); });
 
         function loadPacketHistory() {
             axios.get(`${url}/api/history`)
                 .then(res => {
                     packetHistory = res.data;
-                    hEncCount = packetHistory.filter(p => p.encryption && p.encryption.includes('Encrypted')).length;
-                    hPlainCount = packetHistory.length - hEncCount;
-                    packetHistory.forEach(p => { hUniqueIPs.add(p.src); hUniqueIPs.add(p.dst); });
+                    encCount = packetHistory.filter(p => p.encryption && p.encryption.includes('Encrypted')).length;
+                    plainCount = packetHistory.length - encCount;
+                    uniqueIPs.clear();
+                    packetHistory.forEach(p => { uniqueIPs.add(p.src); uniqueIPs.add(p.dst); });
 
-                    renderHistory();
+                    renderHistory(); // วาดตาราง
                 })
                 .catch(err => console.error("โหลดประวัติพัง!", err));
+
+            axios.get(`${url}/api/packets/count`)
+                .then(res => {
+                    document.getElementById('statTotal').textContent = res.data.total;
+                })
+                .catch(err => console.error("โหลด Count พัง!", err));
         }
 
         document.addEventListener('DOMContentLoaded', () => {
             checkRole();
+            loadUsers();
             loadPacketHistory();
         });
 

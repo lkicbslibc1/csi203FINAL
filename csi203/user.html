@@ -393,8 +393,7 @@
                     placeholder="🔍 ค้นหา (IP, protocol, cipher...)">
                 <button class="btn-export" onclick="exportCSV()">📄 Export CSV</button>
                 <button class="btn-export" onclick="exportJSON()">{ } Export JSON</button>
-                <button class="btn-export"
-                    onclick="if(confirm('ลบประวัติทั้งหมด?')){packetHistory=[];renderHistory()}">🗑 Clear</button>
+                <button class="btn-export" <button class="btn-export" onclick="clearHistory()">🗑 Clear</button>
                 <span class="text-muted small" id="historyCount">0 records</span>
             </div>
             <!-- Table -->
@@ -723,7 +722,8 @@
             // Render table (last 500, newest first)
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
-            const slice = filtered.slice(-500).reverse();
+            // const slice = filtered.slice(-500).reverse();
+            const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);
@@ -747,6 +747,29 @@
             });
         }
         document.getElementById('historySearch').addEventListener('input', renderHistory);
+
+        function clearHistory() {
+            if (confirm('ลบประวัติทั้งหมด?')) {
+
+                axios.delete(`${url}/api/packets/me`)
+                    .then(res => {
+
+                        packetHistory = [];
+                        hEncCount = 0;
+                        hPlainCount = 0;
+                        hUniqueIPs.clear();
+
+                        renderHistory();
+
+                        document.getElementById('hStatTotal').textContent = 0;
+                        document.getElementById('hStatEnc').textContent = 0;
+                        document.getElementById('hStatPlain').textContent = 0;
+                        document.getElementById('hStatIPs').textContent = 0;
+
+                    })
+                    .catch(err => console.error("❌ ลบประวัติใน DB Error", err));
+            }
+        }
 
         // ===== EXPORT =====
         function exportCSV() {
