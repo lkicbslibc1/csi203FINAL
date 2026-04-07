@@ -12,18 +12,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #0b0f19;
-            --bg-secondary: #111827;
-            --bg-card: #1a2035;
-            --bg-card-hover: #1f2845;
-            --border-color: #2a3352;
-            --accent: #6366f1;
-            --accent-glow: rgba(99, 102, 241, .25);
-            --accent2: #22d3ee;
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --border-color: #334155;
+            --accent: #facc15;
+            --accent-glow: rgba(250, 204, 21, .25);
+            --accent2: #facc15;
             --danger: #ef4444;
             --success: #10b981;
             --warn: #f59e0b;
-            --text-primary: #e2e8f0;
+            --text-primary: #f8fafc;
             --text-secondary: #94a3b8;
         }
 
@@ -70,7 +70,8 @@
         }
 
         .admin-nav .badge-admin {
-            background: linear-gradient(135deg, var(--accent), #818cf8);
+            background: var(--accent);
+            color: #0f172a;
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 11px;
@@ -108,7 +109,7 @@
         .tab-btn.active {
             color: var(--accent);
             border-bottom-color: var(--accent);
-            background: rgba(99, 102, 241, .1);
+            background: rgba(250, 204, 21, .1);
         }
 
         .tab-content {
@@ -295,20 +296,21 @@
         }
 
         .btn-accent {
-            background: linear-gradient(135deg, var(--accent), #818cf8);
-            color: #fff;
+            background: var(--accent);
+            color: #0f172a;
             border: none;
             padding: 8px 20px;
             border-radius: 8px;
             font-weight: 600;
             font-size: 13px;
             cursor: pointer;
-            transition: transform .15s, box-shadow .15s;
+            transition: transform .15s, box-shadow .15s, background-color .15s;
         }
 
         .btn-accent:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 15px var(--accent-glow);
+            background: #eab308;
         }
 
         .btn-danger {
