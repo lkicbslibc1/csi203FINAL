@@ -661,6 +661,9 @@
             <span id="liveIndicator" class="d-none" style="color:var(--success);font-size:12px;">● <span
                     class="pulse">LIVE</span></span>
             <div style="flex:1;"></div>
+            <select id="filterUser">
+                <option value="">👥 All Users</option>
+            </select>
             <select id="filterProto">
                 <option value="">All Protocols</option>
                 <option value="TCP">TCP</option>
@@ -721,6 +724,7 @@
                 <thead>
                     <tr>
                         <th>Time</th>
+                        <th>User</th>
                         <th>Protocol</th>
                         <th>Source</th>
                         <th>Destination</th>
@@ -952,7 +956,40 @@
 
         // ========== AUTH ==========
         let currentOnlineUsers = [];
+        let allRegisteredUsers = [];
         let myUser = null;  // เก็บ user info ไว้ส่ง identify ซ้ำได้
+
+
+        // filter dropdown ของ user ทั้งหมด
+        function updateUserFilterDropdowns() {
+            const selHistory = document.getElementById('historyUserFilter');
+            const selLive = document.getElementById('filterUser');
+            if (!selHistory) return;
+
+            const currentValHistory = selHistory.value;
+            const currentValLive = selLive ? selLive.value : '';
+
+            selHistory.innerHTML = '<option value="">👥 All Users (ทุกคน)</option>';
+            if (selLive) selLive.innerHTML = '<option value="">👥 All Users</option>';
+
+            const allNames = new Set();
+            allRegisteredUsers.forEach(u => allNames.add(String(u).trim()));
+            currentOnlineUsers.forEach(u => allNames.add(String(u.username).trim()));
+            packetHistory.forEach(p => {
+                const u = String(p._user || p.username || '').trim();
+                if (u && u !== 'network' && u !== 'undefined') allNames.add(u);
+            });
+
+            Array.from(allNames).sort().forEach(name => {
+                const isOn = currentOnlineUsers.some(u => u.username === name);
+                const optHTML = `<option value="${name}">${isOn ? '🟢' : '⚪'} ${name}</option>`;
+                selHistory.innerHTML += optHTML;
+                if (selLive) selLive.innerHTML += optHTML;
+            });
+
+            selHistory.value = currentValHistory;
+            if (selLive) selLive.value = currentValLive;
+        }
 
         async function checkRole() {
             try {
@@ -976,6 +1013,7 @@
                     uniqueIPs.clear();
                     packetHistory.forEach(p => { uniqueIPs.add(p.src); uniqueIPs.add(p.dst); });
 
+                    updateUserFilterDropdowns(); // อัปเดต dropdown
                     renderHistory(); // วาดตาราง
                 })
                 .catch(err => console.error("โหลดประวัติพัง!", err));
@@ -1068,18 +1106,7 @@
         </div>
     `).join('');
 
-            // Update user filter dropdown in history
-            const sel = document.getElementById('historyUserFilter');
-            const currentVal = sel.value;
-            sel.innerHTML = '<option value="">👥 All Users (ทุกคน)</option>';
-            // Get unique usernames from history + online
-            const allUsernames = new Set(users.map(u => u.username));
-            packetHistory.forEach(p => { if (p._user) allUsernames.add(p._user); });
-            allUsernames.forEach(name => {
-                const isOn = users.some(u => u.username === name);
-                sel.innerHTML += `<option value="${name}">${isOn ? '🟢' : '⚪'} ${name}</option>`;
-            });
-            sel.value = currentVal;
+            updateUserFilterDropdowns();
 
             // Update online status in users tab if visible
             if (document.getElementById('tab-users').classList.contains('active')) loadUsers();
@@ -1136,12 +1163,15 @@
             }
 
             // Filter สำหรับ live table เท่านั้น
+            const fUser = document.getElementById('filterUser').value;
             const fp = document.getElementById('filterProto').value;
             const fi = document.getElementById('filterIP').value;
             const fport = document.getElementById('filterPort').value;
-            if (fp && !data.protocol.includes(fp)) return;
-            if (fi && !data.src.includes(fi) && !data.dst.includes(fi)) return;
-            if (fport && data.port.toString() !== fport) return;
+
+            if (fUser && String(data._user).trim().toLowerCase() !== fUser.trim().toLowerCase()) return;
+            if (fp && !String(data.protocol).toLowerCase().includes(fp.toLowerCase())) return;
+            if (fi && !String(data.src).toLowerCase().includes(fi.toLowerCase()) && !String(data.dst).toLowerCase().includes(fi.toLowerCase())) return;
+            if (fport && String(data.port).toLowerCase() !== fport.toLowerCase()) return;
 
             // Table row
             const tbody = document.getElementById('packetTableBody');
@@ -1155,6 +1185,7 @@
 
             row.innerHTML = `
         <td style="color:var(--text-secondary)">${data._time}</td>
+        <td><span style="color:var(--accent);font-size:11px">${data._user || '—'}</span></td>
         <td><span class="badge-proto ${getProtoBadge(data.protocol)}">${alertIcon}${data.protocol}</span></td>
         <td>${data.src}</td><td>${data.dst}</td>
         <td style="color:var(--accent)">${data.port || '-'}</td>
@@ -1195,20 +1226,27 @@
         }, 1000);
 
         // Filter handlers
-        ['filterProto', 'filterIP', 'filterPort'].forEach(id => {
-            document.getElementById(id).addEventListener('input', () => {
-                document.querySelectorAll('#packetTableBody tr').forEach(row => {
-                    const fp = document.getElementById('filterProto').value;
-                    const fi = document.getElementById('filterIP').value;
-                    const fport = document.getElementById('filterPort').value;
-                    let show = true;
-                    if (fp && !row.cells[1].innerText.includes(fp)) show = false;
-                    if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
-                    if (fport && row.cells[4].innerText !== fport) show = false;
-                    row.style.display = show ? '' : 'none';
-                });
-            });
+        ['filterProto', 'filterIP', 'filterPort', 'filterUser'].forEach(id => {
+            document.getElementById(id)?.addEventListener('input', runLiveFilters);
+            document.getElementById(id)?.addEventListener('change', runLiveFilters);
         });
+
+        function runLiveFilters() {
+            document.querySelectorAll('#packetTableBody tr').forEach(row => {
+                const fUser = document.getElementById('filterUser').value.trim().toLowerCase();
+                const fp = document.getElementById('filterProto').value.trim().toLowerCase();
+                const fi = document.getElementById('filterIP').value.trim().toLowerCase();
+                const fport = document.getElementById('filterPort').value.trim().toLowerCase();
+
+                let show = true;
+                if (fUser && row.cells[1].textContent.trim().toLowerCase() !== fUser) show = false;
+                if (fp && !row.cells[2].textContent.trim().toLowerCase().includes(fp)) show = false;
+                if (fi && !row.cells[3].textContent.trim().toLowerCase().includes(fi) && !row.cells[4].textContent.trim().toLowerCase().includes(fi)) show = false;
+                if (fport && row.cells[5].textContent.trim().toLowerCase() !== fport) show = false;
+
+                row.style.display = show ? '' : 'none';
+            });
+        }
 
         // ========== PACKET DETAIL ==========
         function showDetail(data) {
@@ -1227,13 +1265,13 @@
         // ========== HISTORY ==========
         function renderHistory() {
             const q = document.getElementById('historySearch').value.toLowerCase();
-            const userFilter = document.getElementById('historyUserFilter').value;
+            const userFilter = document.getElementById('historyUserFilter').value.trim().toLowerCase();
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
             let filtered = packetHistory;
-            if (userFilter) filtered = filtered.filter(p => p._user === userFilter);
+            if (userFilter) filtered = filtered.filter(p => String(p._user || p.username || '').trim().toLowerCase() === userFilter);
             if (q) filtered = filtered.filter(p =>
-                (p.protocol + p.src + p.dst + p.port + (p.cipher || '') + (p.tls_version || '') + (p.cert || '') + (p._user || '')).toLowerCase().includes(q)
+                (p.protocol + p.src + p.dst + p.port + (p.cipher || '') + (p.tls_version || '') + (p.cert || '') + (p._user || p.username || '')).toLowerCase().includes(q)
             );
             document.getElementById('historyCount').textContent = filtered.length + ' records';
 
@@ -1250,7 +1288,7 @@
                 row.innerHTML = `
             <td style="color:var(--text-secondary)">${filtered.length - i}</td>
             <td>${d._time || '—'}</td>
-            <td><span style="color:var(--accent);font-size:11px">${d._user || '—'}</span></td>
+            <td><span style="color:var(--accent);font-size:11px">${d._user || d.username || '—'}</span></td>
             <td><span class="badge-proto ${getProtoBadge(d.protocol)}">${alertIcon}${d.protocol}</span></td>
             <td>${d.src}</td><td>${d.dst}</td>
             <td style="color:var(--accent)">${d.port || '-'}</td>
@@ -1298,6 +1336,9 @@
                 const onlineNames = currentOnlineUsers.map(u => u.username);
                 const onlineCount = new Set(onlineNames).size;
                 document.getElementById('userOnlineInfo').textContent = onlineCount + ' online';
+
+                allRegisteredUsers = res.data.map(u => u.username);
+                updateUserFilterDropdowns();
 
                 res.data.forEach(u => {
                     const row = tbody.insertRow();
@@ -1514,15 +1555,6 @@
             document.getElementById('tab-' + name).classList.add('active');
             event.target.classList.add('active');
             if (name === 'history') {
-                const sel = document.getElementById('historyUserFilter');
-                const current = sel.value;
-                sel.innerHTML = '<option value="">👥 All Users (ทุกคน)</option>';
-                const names = new Set(packetHistory.map(p => p._user).filter(Boolean));
-                names.forEach(n => {
-                    const isOn = currentOnlineUsers.some(u => u.username === n);
-                    sel.innerHTML += `<option value="${n}">${isOn ? '🟢' : '⚪'} ${n}</option>`;
-                });
-                sel.value = current;
                 renderHistory();
             }
             if (name === 'users') loadUsers();

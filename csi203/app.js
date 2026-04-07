@@ -335,7 +335,7 @@ io.on('connection', (socket) => {
         const safePort = (pkt.port === '-' || isNaN(pkt.port)) ? 0 : pkt.port;
 
         const values = [
-            pkt._user, 
+            pkt._user,
             pkt.protocol, pkt.src, pkt.dst, safePort, pkt.size,
             pkt.encryption, pkt.cipher, pkt.cert, pkt.tls_version,
             pkt.handshake_type, pkt.payload
@@ -373,9 +373,11 @@ app.put('/alerts/thresholds', (req, res) => {
     if (certExpiryWarningDays) ALERT_THRESHOLDS.certExpiryWarningDays = certExpiryWarningDays;
     res.json({ success: true, thresholds: ALERT_THRESHOLDS });
 });
+
+// ดึงประวัติการใช้งาน ของแอดมิน (ดึงข้อมูลทั้งหมดของทุกคน)
 app.get('/api/history', verifyToken, (req, res) => {
     if (req.user.role === 'admin') {
-        db.query('SELECT * FROM packets ORDER BY id DESC LIMIT 500', (err, results) => {
+        db.query('SELECT * FROM packets ORDER BY id DESC', (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });
