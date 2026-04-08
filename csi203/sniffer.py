@@ -321,8 +321,12 @@ def analyze_packet(packet):
             proto = "TCP"
             port = packet[TCP].dport
             sport = packet[TCP].sport
+            if sport == 3000 or port == 3000:
+                return
+            elif sport == 3306 or port == 3306:
+                return
 
-            if port == 80 or sport == 80:
+            elif port == 80 or sport == 80:
                 proto = "HTTP"
             elif port == 443 or sport == 443:
                 # ====================================================

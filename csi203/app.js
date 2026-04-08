@@ -25,7 +25,7 @@ db.connect((err) => {
         console.log('✅ MySQL Connected! ท่อพร้อมใช้งาน!');
     }
 });
-const host = 'localhost'
+const host = '0.0.0.0'
 const port = 3000
 const SECRET_KEY = process.env.JWT_SECRET;
 // ===== ALERT SYSTEM =====
@@ -243,7 +243,14 @@ app.use(express.json())
 app.use(cookieParser());
 app.use(express.static('.'));
 app.use(cors({
-    origin: 'http://localhost:3000',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        
+        // Allow localhost and any origin during development
+        // In production, you'd want to be more specific
+        callback(null, true); 
+    },
     credentials: true
 }));
 
@@ -407,12 +414,12 @@ app.delete('/api/packets/me', verifyToken, (req, res) => {
 });
 app.delete('/api/packets/all', verifyToken, (req, res) => {
     if (req.user.role !== 'admin') {
-        return res.status(403).json({ message: 'มึงไม่ใช่แอดมิน อย่ามาซ่า!' });
+        return res.status(403).json({ message: 'คุณไม่ใช่แอดมิน!' });
     }
 
     db.query('DELETE FROM packets', (err, result) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, message: 'ล้างโกดังเรียบร้อย!' });
+        res.json({ success: true, message: 'ล้างข้อมูลเรียบร้อย!' });
     });
 });
 server.listen(port, host, () => {

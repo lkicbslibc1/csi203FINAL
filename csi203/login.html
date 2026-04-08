@@ -204,7 +204,7 @@
     </div>
 
     <script>
-        const url = "http://localhost:3000"
+        const url = window.location.origin;
         axios.defaults.withCredentials = true;
         function toggleAuth() {
             const loginBox = document.getElementById('loginBox');
