@@ -1139,6 +1139,7 @@
             const fp = document.getElementById('filterProto').value;
             const fi = document.getElementById('filterIP').value;
             const fport = document.getElementById('filterPort').value;
+            if (fp === 'HTTP' && data.protocol.includes('HTTPS')) return;
             if (fp && !data.protocol.includes(fp)) return;
             if (fi && !data.src.includes(fi) && !data.dst.includes(fi)) return;
             if (fport && data.port.toString() !== fport) return;
@@ -1169,7 +1170,15 @@
         // ========== CONTROLS ==========
         function startSniff() {
             const iface = document.getElementById('selectIface').value;
-            socket.emit('control_sniffer', { action: 'start', iface });
+            const fp = document.getElementById('filterProto').value;
+            const fi = document.getElementById('filterIP').value;
+            const fport = document.getElementById('filterPort').value;
+            
+            socket.emit('control_sniffer', { 
+                action: 'start', 
+                iface,
+                filter: { proto: fp, ip: fi, port: fport }
+            });
             isSniffing = true;
             document.getElementById('startBtn').classList.add('d-none');
             document.getElementById('stopBtn').classList.remove('d-none');
@@ -1202,7 +1211,9 @@
                     const fi = document.getElementById('filterIP').value;
                     const fport = document.getElementById('filterPort').value;
                     let show = true;
-                    if (fp && !row.cells[1].innerText.includes(fp)) show = false;
+                    const protoText = row.cells[1].innerText;
+                    if (fp === 'HTTP' && protoText.includes('HTTPS')) show = false;
+                    else if (fp && !protoText.includes(fp)) show = false;
                     if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
                     if (fport && row.cells[4].innerText !== fport) show = false;
                     row.style.display = show ? '' : 'none';
