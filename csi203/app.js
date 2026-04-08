@@ -268,6 +268,7 @@ io.on('connection', (socket) => {
             }
             if (clientIp === '::1') {
                 clientIp = '127.0.0.1'; // จัดการกรณีเทสในเครื่องตัวเอง
+                //มีการแปลงค่าถ้าเป็น localhost (เช่น เปลี่ยน ::1 ให้เป็น 127.0.0.1) เพื่อให้ระบบเปรียบเทียบ IP ได้ถูกต้อง
             }
 
             onlineUsers.set(socket.id, {
@@ -383,7 +384,7 @@ app.get('/api/history', verifyToken, (req, res) => {
         });
     } else {
         const loggedInUser = req.user.username;
-        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500', [loggedInUser], (err, results) => {
+        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC', [loggedInUser], (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });

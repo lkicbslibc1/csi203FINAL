@@ -12,24 +12,6 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-        :root {
-            --bg-primary: #09090b;
-            --bg-secondary: #18181b;
-            --bg-card: #18181b;
-            --bg-card-hover: #27272a;
-            --border-color: #27272a;
-            --accent: #0ea5e9;
-            --accent-glow: rgba(14, 165, 233, .25);
-            --danger: #ef4444;
-            --success: #10b981;
-            --warn: #f59e0b;
-            --info: #3b82f6;
-            --text-primary: #f8fafc;
-            --text-secondary: #a1a1aa;
-        }
-
         body {
             background: linear-gradient(rgba(0, 0, 0, 0.92), rgba(0, 0, 0, 0.92)), url('bg_login.jpg') no-repeat center center fixed;
             background-size: cover;
@@ -61,20 +43,18 @@
         }
 
         .table-container {
-            padding: 0;
-            max-height: 550px;
-            overflow-y: auto;
+            background: white;
+            padding: 15px;
             border-radius: 10px;
-            border: 1px solid var(--border-color);
-            background: var(--bg-card);
-            scrollbar-color: var(--border-color) var(--bg-secondary);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, .1);
+            max-height: 500px;
+            overflow-y: auto;
         }
 
-        /* Scrollbars */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
-        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+        .status-encrypted {
+            color: #198754;
+            font-weight: bold;
+        }
 
         /* Typography & Status */
         .status-encrypted { color: #34d399; font-weight: 600; text-shadow: 0 0 10px rgba(52, 211, 153, 0.4); }
@@ -97,22 +77,21 @@
         }
 
         .user-tab-btn {
-            padding: 10px 20px;
+            padding: 12px 24px;
             border: none;
             background: transparent;
-            color: var(--text-secondary);
-            font-size: 13px;
+            color: #6c757d;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
-            border-bottom: 2px solid transparent;
-            border-radius: 8px 8px 0 0;
-            transition: all 0.2s;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all .2s;
         }
 
         .user-tab-btn:hover {
-            color: var(--text-primary);
-            background: rgba(14, 165, 233, 0.08);
-            transform: none;
+            color: #0d6efd;
+            background: #f0f6ff;
         }
 
         .user-tab-btn.active {
@@ -124,12 +103,12 @@
             text-shadow: 0 0 12px #06b6d4, 0 0 20px #06b6d4;
         }
 
-        .user-tab-content { display: none; }
-        .user-tab-content.active { display: block; animation: fadeIn 0.3s ease; }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
+        .user-tab-content {
+            display: none;
+        }
+
+        .user-tab-content.active {
+            display: block;
         }
 
         /* History controls */
@@ -178,8 +157,25 @@
             cursor: pointer;
             transition: transform 0.15s, box-shadow 0.15s, background-color 0.15s;
             display: flex;
+            gap: 12px;
             align-items: center;
-            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .history-ctrl input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .btn-export {
+            border: 1px solid #dee2e6;
+            background: #fff;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all .15s;
         }
 
         .btn-export:hover {
@@ -321,77 +317,134 @@
             padding: 16px 20px;
             border-radius: 16px 16px 0 0 !important;
         }
-        .card-body { padding: 20px; }
 
-        /* Badges */
-        .badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0; }
-        .bg-success { background: rgba(16, 185, 129, 0.15) !important; color: #34d399 !important; border: none; }
-        .bg-secondary { background: rgba(148, 163, 184, 0.15) !important; color: var(--text-secondary) !important; border: none; }
-        .bg-primary { background: rgba(99, 102, 241, 0.15) !important; color: #a5b4fc !important; border: none; }
-        .bg-danger { background: rgba(239, 68, 68, 0.15) !important; color: #fca5a5 !important; border: none; }
+        .history-stat .num {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0d6efd;
+        }
 
-        /* Modal */
-        .modal-header { border-bottom: 1px solid var(--border-color); padding: 16px 20px; background: var(--bg-card); border-radius: 12px 12px 0 0;}
-        .modal-body { padding: 20px; background: var(--bg-card); border-radius: 0 0 12px 12px;}
-        .btn-close-white { filter: invert(1); opacity: 0.5; }
-        #packetDetailContent { background: var(--bg-secondary) !important; color: #22d3ee; border: 1px solid var(--border-color) !important; border-radius: 8px; padding: 16px; font-size: 12px;}
+        .history-stat .label {
+            font-size: 11px;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
 
-        /* Alerts */
-        .table-danger { --bs-table-bg: transparent !important; --bs-table-color: var(--text-primary) !important; }
-        .table-hover tbody tr.table-danger:hover td { background-color: rgba(239, 68, 68, 0.1) !important; }
-        .table-hover tbody tr.table-danger td { border-bottom: 1px solid rgba(239, 68, 68, 0.2) !important; }
-        
-        .sev-CRITICAL { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
-        .sev-HIGH { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border: 1px solid rgba(245,158,11,0.3); }
-        .sev-MEDIUM { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
-        .sev-LOW { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+        /* Alerts Tab specific */
+        .sev-CRITICAL {
+            background-color: rgba(239, 68, 68, 0.1);
+            color: #dc3545;
+            font-weight: bold;
+        }
 
+        .sev-HIGH {
+            background-color: rgba(245, 158, 11, 0.1);
+            color: #fd7e14;
+            font-weight: bold;
+        }
+
+        .sev-MEDIUM {
+            background-color: rgba(13, 110, 253, 0.1);
+            color: #0d6efd;
+            font-weight: bold;
+        }
+
+        .sev-LOW {
+            background-color: rgba(25, 135, 84, 0.1);
+            color: #198754;
+            font-weight: bold;
+        }
+
+        /* Toast notification */
         .alert-toast {
             position: fixed;
-            bottom: 24px;
-            left: 24px;
+            top: 80px;
+            right: 20px;
+            z-index: 9999;
+            background: #fff;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 15px;
             min-width: 320px;
             max-width: 400px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-left-width: 4px;
-            border-radius: 12px;
-            padding: 16px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
             display: flex;
             align-items: flex-start;
-            gap: 14px;
-            z-index: 1050;
-            color: var(--text-primary);
-            animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            gap: 12px;
+            animation: slideIn .3s ease;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, .1);
         }
 
-        .alert-toast.CRITICAL { border-left-color: var(--danger); }
-        .alert-toast.HIGH { border-left-color: var(--warn); }
-        .alert-toast.MEDIUM { border-left-color: var(--accent); }
-        .alert-toast.LOW { border-left-color: var(--success); }
+        .alert-toast.CRITICAL {
+            border-left: 4px solid #dc3545;
+        }
 
-        .toast-icon { font-size: 22px; line-height: 1; margin-top: 2px; }
-        .toast-body { flex: 1; }
-        .toast-title { font-weight: 700; font-size: 13px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-        .toast-msg { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
-        
-        .toast-close {
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 22px;
-            cursor: pointer;
-            padding: 0 4px;
-            margin-top: -6px;
-            margin-right: -4px;
+        .alert-toast.HIGH {
+            border-left: 4px solid #fd7e14;
+        }
+
+        .alert-toast.MEDIUM {
+            border-left: 4px solid #0d6efd;
+        }
+
+        .alert-toast.LOW {
+            border-left: 4px solid #198754;
+        }
+
+        .alert-toast .toast-icon {
+            font-size: 20px;
             line-height: 1;
-            transition: color 0.2s;
         }
-        .toast-close:hover { color: var(--danger); }
 
-        @keyframes slideIn { from { transform: translateX(-120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-120%); opacity: 0; } }
+        .alert-toast .toast-body {
+            flex: 1;
+        }
+
+        .alert-toast .toast-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #212529;
+        }
+
+        .alert-toast .toast-msg {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 4px;
+        }
+
+        .alert-toast .toast-close {
+            background: none;
+            border: none;
+            color: #adb5bd;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            padding: 0;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1
+            }
+        }
+
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1
+            }
+
+            to {
+                transform: translateX(100%);
+                opacity: 0
+            }
+        }
     </style>
 </head>
 
@@ -459,10 +512,16 @@
                     </div>
                 </div>
             </div>
-            <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:24px;margin-bottom:24px;">
-                <div class="chart-container" style="margin-bottom:0; padding:20px; display:flex; justify-content:center; align-items:center;"><canvas id="lineChart"></canvas></div>
-                <div class="chart-container" style="margin-bottom:0; padding:20px; display:flex; justify-content:center; align-items:center;"><canvas id="pieChart"></canvas></div>
-                <div class="chart-container" style="margin-bottom:0; padding:20px; display:flex; justify-content:center; align-items:center;"><canvas id="barChart"></canvas></div>
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="chart-container"><canvas id="lineChart"></canvas></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="chart-container"><canvas id="pieChart"></canvas></div>
+                </div>
+                <div class="col-md-4">
+                    <div class="chart-container"><canvas id="barChart"></canvas></div>
+                </div>
             </div>
             <div class="row">
                 <div class="col-12">
@@ -733,6 +792,7 @@
             const fi = document.getElementById('filterIP').value;
             const fport = document.getElementById('filterPort').value;
             const fsize = document.getElementById('filterMinSize').value;
+            if (fp === 'HTTP' && data.protocol.includes('HTTPS')) return;
             if (fp && !data.protocol.includes(fp)) return;
             if (fi && !data.src.includes(fi) && !data.dst.includes(fi)) return;
             if (fport && data.port.toString() !== fport) return;
@@ -771,7 +831,16 @@
 
         // ===== CONTROLS =====
         document.getElementById('startBtn').addEventListener('click', () => {
-            socket.emit('control_sniffer', { action: 'start', iface: document.getElementById('selectIface').value });
+            const fp = document.getElementById('filterProto').value;
+            const fi = document.getElementById('filterIP').value;
+            const fport = document.getElementById('filterPort').value;
+            const fsize = document.getElementById('filterMinSize').value;
+            
+            socket.emit('control_sniffer', { 
+                action: 'start', 
+                iface: document.getElementById('selectIface').value,
+                filter: { proto: fp, ip: fi, port: fport, size: fsize }
+            });
             isSniffing = true;
             document.getElementById('startBtn').classList.add('d-none');
             document.getElementById('stopBtn').classList.remove('d-none');
@@ -796,7 +865,9 @@
             const fsize = document.getElementById('filterMinSize').value;
             document.querySelectorAll('#packetTableBody tr').forEach(row => {
                 let show = true;
-                if (fp && !row.cells[1].innerText.includes(fp)) show = false;
+                const protoText = row.cells[1].innerText;
+                if (fp === 'HTTP' && protoText.includes('HTTPS')) show = false;
+                else if (fp && !protoText.includes(fp)) show = false;
                 if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
                 if (fport && row.cells[4].innerText !== fport) show = false;
                 if (fsize && parseInt(row.cells[5].innerText) < parseInt(fsize)) show = false;
@@ -847,8 +918,8 @@
             // Render table (last 500, newest first)
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
-            const slice = filtered.slice(-500).reverse();
-            // const slice = filtered.reverse();
+            // const slice = filtered.slice(-500).reverse();
+            const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);

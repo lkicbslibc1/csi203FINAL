@@ -72,6 +72,7 @@ RECORD_TYPE_MAP = {
 
 def get_tls_version_from_raw(payload):
     """อ่าน TLS version จาก raw bytes ของ Record Layer"""
+    #ข้อมูลดิบ 3 ตัวแรกเพื่อระบุว่านี่คืออะไร
     if len(payload) >= 3 and payload[0] in [0x14, 0x15, 0x16, 0x17]:
         major = payload[1]
         minor = payload[2]
@@ -300,6 +301,7 @@ def analyze_packet(packet):
     global total_bytes
 
     try:
+        # ถ้าไม่ใช่ Packet ที่มี IP (เช่น ARP) ให้ข้ามไป
         if not packet.haslayer(IP):
             return
             
@@ -316,7 +318,8 @@ def analyze_packet(packet):
         payload_preview = "N/A"
         handshake_type = ""
         record_type = "N/A"
-
+        #Source Port
+        #Destination Port
         if packet.haslayer(TCP):
             proto = "TCP"
             port = packet[TCP].dport
@@ -324,6 +327,25 @@ def analyze_packet(packet):
 
             if port == 80 or sport == 80:
                 proto = "HTTP"
+                #Payload
+                if packet.haslayer(Raw):
+                    raw_data = packet[Raw].load
+                    try:
+                        # ลองถอดรหัสเป็นข้อความ (Plaintext)
+                        decoded_text = raw_data.decode('utf-8', errors='ignore').strip()
+                        
+                        if decoded_text:
+                            # ถ้าข้อความยาวมากๆ (เช่น โหลดรูป/ไฟล์) ให้ตัดที่ 5000 ตัวอักษรเพื่อกันหน้าเว็บค้าง
+                            if len(decoded_text) > 5000:
+                                payload_preview = decoded_text[:5000] + "\n\n... [ข้อมูลยาวเกิน 5,000 ตัวอักษร ถูกตัดออกเพื่อป้องกันแอปค้าง] ..."
+                            else:
+                                payload_preview = decoded_text # เอามาทั้งหมดเลย!
+                        else:
+                            # ถ้าแปลงเป็นข้อความไม่ได้ (เช่นเป็นไฟล์ Binary) ให้โชว์เป็น Hex
+                            # ตัด Hex ไว้ที่ 1000 ตัวเพื่อความปลอดภัย
+                            payload_preview = raw_data.hex()[:1000] + "..."
+                    except:
+                        payload_preview = raw_data.hex()[:1000] + "..."
             elif port == 443 or sport == 443:
                 # ====================================================
                 # ตรวจจับ TLS แบบครบถ้วน
@@ -455,6 +477,26 @@ def analyze_packet(packet):
             pkt_data["cert_not_after"] = cert_details.get("not_after", "N/A")
             pkt_data["cert_san"] = cert_details.get("san", "N/A")
 
+        if capture_filter:
+            f_proto = capture_filter.get('proto', '')
+            if f_proto:
+                if f_proto == 'HTTP' and 'HTTPS' in pkt_data["protocol"]:
+                    return
+                if f_proto not in pkt_data["protocol"]:
+                    return
+            
+            f_ip = capture_filter.get('ip', '')
+            if f_ip and f_ip not in pkt_data["src"] and f_ip not in pkt_data["dst"]:
+                return
+                
+            f_port = capture_filter.get('port', '')
+            if f_port and str(pkt_data["port"]) != str(f_port):
+                return
+                
+            f_size = capture_filter.get('size', '')
+            if f_size and pkt_data["size"] < int(f_size):
+                return
+
         if sio.connected:
             sio.emit('new_packet', pkt_data)
 
@@ -466,10 +508,11 @@ def analyze_packet(packet):
 def start_capture(interface):
     global stats_thread_started
     if not stats_thread_started:
-        threading.Thread(target=emit_network_stats, daemon=True).start()
+        threading.Thread(target=emit_network_stats, daemon=True).start() #daemonคือถ้าปิดไป มันก็จะfalse
         stats_thread_started = True
     try:
         print(f"🚀 Starting capture on: {interface}")
+        #prn Process
         sniff(iface=interface, prn=analyze_packet, stop_filter=lambda p: stop_event.is_set(), store=0)
     except Exception as e:
         print(f"❌ Capture Error: {e}")
@@ -487,15 +530,21 @@ def connect():
     print("✅ เชื่อมต่อสำเร็จ!")
     sio.emit('available_interfaces', get_available_ifaces())
 
+# รอฟังอัปเดต / start / stop
+capture_filter = {}
 
 @sio.on('control_sniffer')
 def on_control(data):
-    global sniff_thread
+    global sniff_thread, capture_filter
     if data['action'] == 'start':
-        print(f"🚀 เริ่มดักจับบน: {data['iface']}")
-        stop_event.clear()
-        sniff_thread = threading.Thread(target=start_capture, args=(data['iface'],))
+        capture_filter = data.get('filter', {})
+        print(f"🚀 เริ่มดักจับบน: {data['iface']} | Filter: {capture_filter}")
+        stop_event.clear() # เพื่ออนุญาตให้การดักจับทำงานได้
+        sniff_thread = threading.Thread(target=start_capture, args=(data['iface'],)) #รันฟังก์ชัน start_capture
         sniff_thread.start()
+    elif data['action'] == 'update_filter':
+        capture_filter = data.get('filter', {})
+        print(f"⚙️ อัปเดต Filter สด: {capture_filter}")
     elif data['action'] == 'stop':
         print("🛑 หยุดดักจับ...")
         stop_event.set()

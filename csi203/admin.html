@@ -12,18 +12,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-primary: #0f172a;
-            --bg-secondary: #1e293b;
-            --bg-card: #1e293b;
-            --bg-card-hover: #334155;
-            --border-color: #334155;
-            --accent: #facc15;
-            --accent-glow: rgba(250, 204, 21, .25);
-            --accent2: #facc15;
+            --bg-primary: #0b0f19;
+            --bg-secondary: #111827;
+            --bg-card: #1a2035;
+            --bg-card-hover: #1f2845;
+            --border-color: #2a3352;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, .25);
+            --accent2: #22d3ee;
             --danger: #ef4444;
             --success: #10b981;
             --warn: #f59e0b;
-            --text-primary: #f8fafc;
+            --text-primary: #e2e8f0;
             --text-secondary: #94a3b8;
         }
 
@@ -76,8 +76,7 @@
         }
 
         .admin-nav .badge-admin {
-            background: var(--accent);
-            color: #0f172a;
+            background: linear-gradient(135deg, var(--accent), #818cf8);
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 11px;
@@ -314,21 +313,20 @@
         }
 
         .btn-accent {
-            background: var(--accent);
-            color: #0f172a;
+            background: linear-gradient(135deg, var(--accent), #818cf8);
+            color: #fff;
             border: none;
             padding: 8px 20px;
             border-radius: 8px;
             font-weight: 600;
             font-size: 13px;
             cursor: pointer;
-            transition: transform .15s, box-shadow .15s, background-color .15s;
+            transition: transform .15s, box-shadow .15s;
         }
 
         .btn-accent:hover {
             transform: translateY(-1px);
             box-shadow: 0 4px 15px var(--accent-glow);
-            background: #eab308;
         }
 
         .btn-danger {
@@ -1187,11 +1185,10 @@
             const fp = document.getElementById('filterProto').value;
             const fi = document.getElementById('filterIP').value;
             const fport = document.getElementById('filterPort').value;
-
-            if (fUser && String(data._user).trim().toLowerCase() !== fUser.trim().toLowerCase()) return;
-            if (fp && !String(data.protocol).toLowerCase().includes(fp.toLowerCase())) return;
-            if (fi && !String(data.src).toLowerCase().includes(fi.toLowerCase()) && !String(data.dst).toLowerCase().includes(fi.toLowerCase())) return;
-            if (fport && String(data.port).toLowerCase() !== fport.toLowerCase()) return;
+            if (fp === 'HTTP' && data.protocol.includes('HTTPS')) return;
+            if (fp && !data.protocol.includes(fp)) return;
+            if (fi && !data.src.includes(fi) && !data.dst.includes(fi)) return;
+            if (fport && data.port.toString() !== fport) return;
 
             // Table row
             const tbody = document.getElementById('packetTableBody');
@@ -1220,7 +1217,15 @@
         // ========== CONTROLS ==========
         function startSniff() {
             const iface = document.getElementById('selectIface').value;
-            socket.emit('control_sniffer', { action: 'start', iface });
+            const fp = document.getElementById('filterProto').value;
+            const fi = document.getElementById('filterIP').value;
+            const fport = document.getElementById('filterPort').value;
+            
+            socket.emit('control_sniffer', { 
+                action: 'start', 
+                iface,
+                filter: { proto: fp, ip: fi, port: fport }
+            });
             isSniffing = true;
             document.getElementById('startBtn').classList.add('d-none');
             document.getElementById('stopBtn').classList.remove('d-none');
@@ -1246,9 +1251,21 @@
         }, 1000);
 
         // Filter handlers
-        ['filterProto', 'filterIP', 'filterPort', 'filterUser'].forEach(id => {
-            document.getElementById(id)?.addEventListener('input', runLiveFilters);
-            document.getElementById(id)?.addEventListener('change', runLiveFilters);
+        ['filterProto', 'filterIP', 'filterPort'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                document.querySelectorAll('#packetTableBody tr').forEach(row => {
+                    const fp = document.getElementById('filterProto').value;
+                    const fi = document.getElementById('filterIP').value;
+                    const fport = document.getElementById('filterPort').value;
+                    let show = true;
+                    const protoText = row.cells[1].innerText;
+                    if (fp === 'HTTP' && protoText.includes('HTTPS')) show = false;
+                    else if (fp && !protoText.includes(fp)) show = false;
+                    if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
+                    if (fport && row.cells[4].innerText !== fport) show = false;
+                    row.style.display = show ? '' : 'none';
+                });
+            });
         });
 
         function runLiveFilters() {
@@ -1295,8 +1312,8 @@
             );
             document.getElementById('historyCount').textContent = filtered.length + ' records';
 
-            const slice = filtered.slice(-500).reverse();
-            // const slice = filtered.reverse();
+            // const slice = filtered.slice(-500).reverse();
+            const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);
