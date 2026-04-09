@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PacketDukjub - Crypto Lab</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="src/crypto_lab.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js"></script>
+    <style>
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Navbar */
+        .admin-nav {
+            background: linear-gradient(90deg, #0f172a, rgba(234, 179, 8, 0.5), #0f172a);
+            background-size: 200% 200%;
+            animation: gradientMove 6s ease infinite;
+            border-bottom: 2px solid #facc15;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .admin-nav .brand { font-size: 20px; font-weight: 700; }
+        .admin-nav .brand span { color: #facc15; text-shadow: 0 0 15px rgba(250, 204, 21, 0.8); }
+
+        .btn-back {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #f8fafc;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-back:hover {
+            border-color: #facc15;
+            color: #facc15;
+            background: rgba(250, 204, 21, 0.1);
+        }
+
+        main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+        .hero-section { margin-bottom: 20px; }
+        .hero-section h1 { font-size: 24px; margin-bottom: 10px; color: #facc15; display: flex; align-items: center; gap: 10px; }
+        .hero-section p { color: #94a3b8; font-size: 14px; max-width: 800px; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <div class="admin-nav">
+        <div class="brand">🛡️ Packet<span>Dukjub</span> <span style="color:#94a3b8;font-size:13px;font-weight:400;">Crypto Lab</span></div>
+        <div class="nav-right">
+            <a href="admin.html" class="btn-back"><i class="fas fa-arrow-left"></i> Back to Console</a>
+        </div>
+    </div>
+
+    <main class="container">
+        <header class="hero-section">
+        </header>
+        
+        <section class="lab-grid">
+            <!-- Alice's Environment -->
+            <div class="lab-card user-node" id="alice-node">
+                <div class="card-header">
+                    <i class="fas fa-laptop"></i>
+                    <h2>Client (Sender)</h2>
+                </div>
+                <div class="card-content">
+                    <div class="control-group">
+                        <label>Public Key</label>
+                        <div class="key-display" id="alice-public-key-bob">Waiting for Server...</div>
+                    </div>
+                    <div class="control-group">
+                        <label>Message to Server</label>
+                        <textarea id="plain-text" placeholder="Type your secret message here...">Hello Server, this is a top secret message!</textarea>
+                    </div>
+                    <button class="btn btn-primary" id="btn-exchange-key">
+                        <i class="fas fa-key"></i> Perform RSA Key Exchange
+                    </button>
+                    <button class="btn btn-secondary disabled" id="btn-encrypt" disabled>
+                        <i class="fas fa-lock"></i> Encrypt with AES
+                    </button>
+                </div>
+            </div>
+
+            <!-- Visualization / Network -->
+            <div class="lab-card network-node" id="network-flow">
+                <div class="card-header">
+                    <i class="fas fa-network-wired"></i>
+                    <h2>Encrypted Channel</h2>
+                </div>
+                <div class="card-content flow-visualizer">
+                    <div class="node-icons">
+                        <i class="fas fa-laptop alice-icon"></i>
+                        <div class="channel-line">
+                            <div id="data-packet" class="packet hidden">
+                                <i class="fas fa-cube"></i>
+                            </div>
+                        </div>
+                        <i class="fas fa-server bob-icon"></i>
+                    </div>
+                    <div class="status-log" id="status-log">
+                        <div class="log-entry system">System initialized. Ready for simulation.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Server's Environment -->
+            <div class="lab-card user-node" id="bob-node">
+                <div class="card-header">
+                    <i class="fas fa-server"></i>
+                    <h2>Server (Receiver)</h2>
+                </div>
+                <div class="card-content">
+                    <div class="control-group">
+                        <label>RSA Keys</label>
+                        <button class="btn btn-small" id="btn-gen-rsa">Generate RSA Pair</button>
+                        <div class="key-pair-status">
+                            <span id="rsa-status"><i class="fas fa-circle-xmark" style="color: #ef4444;"></i> Not Generated</span>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Exchanged Session Key (AES)</label>
+                        <div class="key-display" id="bob-session-key">No session key yet</div>
+                    </div>
+                    <div class="control-group">
+                        <label>Received Ciphertext</label>
+                        <div class="cipher-box" id="bob-received-cipher">Waiting for transmission...</div>
+                    </div>
+                    <button class="btn btn-primary disabled" id="btn-decrypt" disabled>
+                        <i class="fas fa-unlock-keyhole"></i> Decrypt AES Message
+                    </button>
+                    <div class="decrypted-result hidden" id="decrypted-result">
+                        <label>Decrypted Result:</label>
+                        <p id="decrypted-text"></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="src/crypto_lab.js"></script>
+</body>
+</html>

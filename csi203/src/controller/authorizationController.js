@@ -6,10 +6,10 @@ import mysql from 'mysql2/promise';
 const SECRET_KEY = process.env.JWT_SECRET;
 
 export const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: '',
-    database: 'sniffer_db',
+    host: process.env.DB_HOST || '127.0.0.1',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DATABASE || 'sniffer_db',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0

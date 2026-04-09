@@ -509,6 +509,7 @@ if __name__ == '__main__':
     print("=" * 50)
     print("🛡️  PacketDukjub Sniffer (Enhanced TLS Detection)")
     print("=" * 50)
+    print("🌍 Connecting to Node.js backend...")
     try:
         sio.connect('http://localhost:3000')
         sio.wait()
