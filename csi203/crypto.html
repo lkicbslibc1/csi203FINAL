@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Client Encryption</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+</head>
+<body>
+    <h2>Encryption Demo</h2>
+    <input type="text" id="message" placeholder="Enter message">
+    <button onclick="sendEncrypted()">Send Encrypted</button>
+    <p><strong>Decrypted Response:</strong> <span id="response"></span></p>
+
+    <script>
+        // ต้องตรงกับฝั่ง Server
+        const SECRET_KEY = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"; 
+        const IV = "ABCDEF0123456789"; 
+
+        function encryptData(data) {
+            let key = CryptoJS.enc.Utf8.parse(SECRET_KEY);
+            let iv = CryptoJS.enc.Utf8.parse(IV);
+            let encrypted = CryptoJS.AES.encrypt(data, key, { 
+                iv: iv, 
+                mode: CryptoJS.mode.CBC, 
+                padding: CryptoJS.pad.Pkcs7 
+            });
+            return encrypted.toString();
+        }
+
+        function sendEncrypted() {
+            let message = document.getElementById("message").value;
+            let encryptedData = encryptData(message);
+            console.log(`encryptedData = ${encryptedData}`);
+
+            fetch('/decrypt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ data: encryptedData })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("response").innerText = data.decryptedText;
+            })
+            .catch(error => console.error("Error: ", error));
+        }
+    </script>
+</body>
+</html>

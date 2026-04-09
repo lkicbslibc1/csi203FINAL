@@ -425,3 +425,69 @@ app.delete('/api/packets/all', verifyToken, (req, res) => {
 server.listen(port, host, () => {
     console.log(`🚀 Server running on http://${host}:${port}`);
 });
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+import { fileURLToPath } from 'url';
+import crypto from 'crypto';
+
+// 1. จัดการเรื่อง Path สำหรับ ES Modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// 2. Middleware
+app.use(express.json()); // ใช้แทน bodyParser.json() ได้เลย
+app.use(express.static(path.join(__dirname))); 
+
+// 3. ค่าคงที่ (เช็คให้ดี: AES-256 กุญแจต้องมี 32 bytes)
+const IV_STRING = "ABCDEF0123456789"; // 16 characters
+
+/**
+ * ฟังก์ชันถอดรหัส (Reusable)
+ */
+function decryptData(encryptedData) {
+    // แปลง Key และ IV ให้เป็น Buffer ตามที่ Node Crypto ต้องการ
+    const key = Buffer.from(SECRET_KEY, 'utf8');
+    const iv = Buffer.from(IV_STRING, 'utf8');
+
+    // สร้าง Decipher โดยระบุ Algorithm, Key และ IV
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    
+    // ถอดรหัสจาก base64 เป็น utf8
+    let decrypted = decipher.update(encryptedData, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+}
+
+// 4. Routes
+app.post('/decrypt', (req, res) => {
+    try {
+        const encryptedData = req.body.data;
+
+        if (!encryptedData) {
+            return res.status(400).json({ error: 'ส่งข้อมูล (data) มาด้วยมึง' });
+        }
+
+        console.log('--- New Request ---');
+        console.log('Encrypted data (Base64):', encryptedData);
+
+        const decryptedText = decryptData(encryptedData);
+        
+        console.log('Decrypted result:', decryptedText);
+
+        res.json({ 
+            success: true,
+            decryptedText: decryptedText 
+        });
+
+    } catch (error) {
+        console.error('Decryption failed:', error.message);
+        
+        // ถ้า Key หรือ IV ผิด หรือ Data ไม่ใช่ Base64 มันจะวิ่งมาที่นี่
+        res.status(500).json({ 
+            success: false, 
+            error: 'การถอดรหัสผิดพลาด: ' + error.message 
+        });
+    }
+});
