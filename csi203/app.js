@@ -11,21 +11,38 @@ import 'dotenv/config';
 import os from 'os';
 import mysql from 'mysql2';
 
-const db = mysql.createConnection({
+// 1. เปลี่ยนมาใช้ createPool เพื่อความเสถียร (ป้องกันสายหลุด)
+const db = mysql.createPool({
     host: 'localhost',
     user: 'root',
-    password: '',
+    password: '', 
     database: 'sniffer_db',
     timezone: 'Z',
+    waitForConnections: true,
+    connectionLimit: 10,     // เปิดท่อทิ้งไว้สูงสุด 10 ท่อ
+    queueLimit: 0,           // ไม่จำกัดคิวการรอ
+    enableKeepAlive: true,   // ส่งสัญญาณ Check-in กับ Database ตลอดเวลา
+    keepAliveInitialDelay: 10000
 });
 
-db.connect((err) => {
+// 2. ตรวจสอบการเชื่อมต่อ (Pool จะเริ่มทำงานเมื่อมีการเรียกใช้ครั้งแรก)
+db.getConnection((err, connection) => {
     if (err) {
-        console.error('❌ ต่อ MySQL ไม่ได้ ไปสั่ง docker-compose up -d', err);
+        console.error('❌ ต่อ MySQL ไม่ได้! เช็คดูว่ารัน MySQL หรือยัง (docker-compose up -d):', err.message);
     } else {
-        console.log('✅ MySQL Connected! ท่อพร้อมใช้งาน!');
+        console.log('✅ MySQL Connected via Pool! ท่อพร้อมใช้งานยาวๆ!');
+        connection.release(); // คืนท่อเข้า Pool เพื่อให้คนอื่นใช้ต่อ
     }
 });
+
+// 3. แถม: ดักจับ Error เผื่อเคสฉุกเฉิน
+db.on('error', (err) => {
+    console.error('⚠️ DB Pool Error:', err.message);
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+        console.log('🔄 กำลังพยายามเชื่อมต่อใหม่...');
+    }
+});
+
 const host = '0.0.0.0'
 const port = 3000
 const SECRET_KEY = process.env.JWT_SECRET;
