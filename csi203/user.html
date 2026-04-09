@@ -709,8 +709,7 @@
     <div class="user-tabs">
         <button class="user-tab-btn active" onclick="switchTab('live',this)">📡 Live Monitor</button>
         <button class="user-tab-btn" onclick="switchTab('history',this)">📋 ประวัติของฉัน</button>
-        <button class="user-tab-btn" onclick="switchTab('alerts',this)">🚨 Security Alerts <span id="alertTabBadge"
-                class="badge bg-danger d-none" style="font-size:10px;margin-left:4px;">0</span></button>
+        <button class="user-tab-btn" onclick="switchTab('alerts',this)">🚨 Security Alerts</button>
     </div>
 
     <!-- ===== TAB 1: LIVE MONITOR ===== -->
@@ -866,10 +865,7 @@
                     <div class="num text-primary" id="aStatMed">0</div>
                     <div class="label">Medium</div>
                 </div>
-                <div class="history-stat">
-                    <div class="num text-success" id="aStatAck">0</div>
-                    <div class="label">Acknowledged</div>
-                </div>
+
             </div>
             <!-- Controls -->
             <div class="history-ctrl">
@@ -891,14 +887,7 @@
                     <option value="BRUTE_FORCE">Brute Force</option>
                     <option value="DOS_ATTEMPT">DoS Attempt</option>
                 </select>
-                <select id="alertFilterAck" class="form-select form-select-sm" style="max-width:150px;"
-                    onchange="renderAlerts()">
-                    <option value="">All Status</option>
-                    <option value="unacked">Unacknowledged</option>
-                    <option value="acked">Acknowledged</option>
-                </select>
                 <div class="ms-auto flex-grow-1 text-end">
-                    <button class="btn btn-outline-success btn-sm me-2" onclick="ackAllAlerts()">✓ Ack All</button>
                     <span class="text-muted small" id="alertCount">0 alerts</span>
                 </div>
             </div>
@@ -913,7 +902,6 @@
                             <th>Message</th>
                             <th>Source</th>
                             <th>Details</th>
-                            <th>Action</th>
                         </tr>
                     </thead>
                     <tbody id="alertsTableBody"></tbody>
@@ -939,10 +927,35 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        
         const url = window.location.origin;
         axios.defaults.withCredentials = true;
 
-        let myUser = null;
+        const socket = io(url);
+
+        let myUser = null;       // เก็บข้อมูลผู้ใช้ที่กำลังล็อกอิน
+        let isSniffing = false;  
+        let packetHistory = [];
+        let hEncCount = 0, hPlainCount = 0;
+        let hUniqueIPs = new Set();
+        let packetCountInSecond = 0;
+        let allAlerts = [];
+        let toastQueue = [];
+        let toastShowing = false;
+
+        const SEVERITY_ICON = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵' };
+        const TYPE_LABEL = {
+            INSECURE_PROTOCOL: '🔓 Insecure Protocol', WEAK_TLS: '🔐 Weak TLS', CERT_EXPIRY: '📜 Cert Expiry',
+            PORT_SCAN: '🔍 Port Scan', BRUTE_FORCE: '💥 Brute Force', DOS_ATTEMPT: '🌊 DoS Attempt'
+        };
+
+        ///////////////////////////////////////////////////////////////
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkRole();
+            loadPacketHistory();
+        });
 
         async function checkRole() {
             try {
@@ -952,88 +965,98 @@
                 document.getElementById('userDisplay').textContent = user.username + ' (User)';
                 myUser = { users_id: user.users_id || user.id, username: user.username, role: user.role };
                 if (socket.connected) socket.emit('identify', myUser);
-            } catch (err) { window.location.href = 'login.html'; }
+            } catch (err) {
+                // ถ้ายังไม่ล็อกอิน ให้ดีดกลับไปหน้า login.html ทันที
+                window.location.href = 'login.html';
+            }
         }
-        document.addEventListener('DOMContentLoaded', checkRole);
 
         function loadPacketHistory() {
             axios.get(`${url}/api/history`)
                 .then(res => {
                     packetHistory = res.data;
+
                     hEncCount = packetHistory.filter(p => p.encryption && p.encryption.includes('Encrypted')).length;
                     hPlainCount = packetHistory.length - hEncCount;
-                    packetHistory.forEach(p => { hUniqueIPs.add(p.src); hUniqueIPs.add(p.dst); });
 
-                    renderHistory();
+                    // หาจำนวน IP เครื่องที่ไม่ซ้ำกัน
+                    packetHistory.forEach(p => {
+                        hUniqueIPs.add(p.src);
+                        hUniqueIPs.add(p.dst);
+                    });
+
+                    renderHistory(); // วาดข้อมูลลงบนตารางในแท็บประวัติ
                 })
                 .catch(err => console.error("โหลดประวัติพัง!", err));
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            checkRole();
-            loadPacketHistory();
-        });
-
-        function logout() { axios.post(`${url}/auth/logout`).then(() => window.location.href = 'login.html'); }
-
-        // ===== TAB SWITCHING =====
-        function switchTab(name, btn) {
-            document.querySelectorAll('.user-tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.user-tab-content').forEach(t => t.classList.remove('active'));
-            btn.classList.add('active');
-            document.getElementById('tab-' + name).classList.add('active');
-            if (name === 'history') renderHistory();
-            if (name === 'alerts') renderAlerts();
+        function logout() {
+            axios.post(`${url}/auth/logout`)
+                .then(() => window.location.href = 'login.html');
         }
-
-        // ===== STATE =====
-        const socket = io(url);
-        let isSniffing = false;
-        let packetHistory = [];  // เก็บ packet ทั้งหมดที่รับมา
-        let hEncCount = 0, hPlainCount = 0;
-        let hUniqueIPs = new Set();
 
         // ===== CHARTS =====
         const lineChart = new Chart(document.getElementById('lineChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Packets/sec', data: [], borderColor: '#0d6efd', tension: 0.4 }] }, options: { animation: false, scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 } } } } });
         const pieChart = new Chart(document.getElementById('pieChart'), { type: 'doughnut', data: { labels: ['Encrypted 0%', 'Plaintext 0%'], datasets: [{ data: [0, 0], backgroundColor: ['#198754', '#dc3545'] }] } });
         const barChart = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: ['TCP', 'UDP', 'ICMP', 'DNS', 'HTTP', 'HTTPS', 'QUIC'], datasets: [{ label: 'Counts', data: [0, 0, 0, 0, 0, 0, 0], backgroundColor: '#6c757d' }] }, options: { scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 } } } } });
-        let packetCountInSecond = 0;
 
+        //ลำดับ
         function getProtoIndex(proto) {
-            if (proto.includes('QUIC')) return 6; if (proto.includes('HTTPS')) return 5;
-            if (proto.includes('HTTP')) return 4; if (proto.includes('DNS')) return 3;
-            if (proto.includes('ICMP')) return 2; if (proto.includes('UDP')) return 1;
-            if (proto.includes('TCP')) return 0; return -1;
+            if (proto.includes('QUIC')) return 6;
+            if (proto.includes('HTTPS')) return 5;
+            if (proto.includes('HTTP')) return 4;
+            if (proto.includes('DNS')) return 3;
+            if (proto.includes('ICMP')) return 2;
+            if (proto.includes('UDP')) return 1;
+            if (proto.includes('TCP')) return 0;
+            return -1;
         }
 
-        // ===== SOCKET =====
+        setInterval(() => {
+            const now = new Date().toLocaleTimeString();
+            lineChart.data.labels.push(now); //เพิ่มเวลาตอนนี้
+            lineChart.data.datasets[0].data.push(packetCountInSecond);
+            if (lineChart.data.labels.length > 15) {
+                lineChart.data.labels.shift();
+                lineChart.data.datasets[0].data.shift();
+            }
+            lineChart.update();
+            packetCountInSecond = 0; // รีเซ็ตการนับใน 1 วินาที
+        }, 1000); // 1000ms = 1 วินาที
+
+
+        //// Socket ////////////////////////////////////////
+
+
         socket.on('connect', () => {
             socket.emit('request_interfaces');
-            // ★ ส่ง identify ทุกครั้งที่ connect/reconnect
-            if (myUser) socket.emit('identify', myUser);
+            if (myUser) socket.emit('identify', myUser); // แนะนำตัว
         });
 
+        // 4.2 เมื่อ Server ส่งรายชื่อการ์ดแลน (Interface) กลับมา ให้นำมาใส่เป็นตัวเลือกใน Dropdown
         socket.on('available_interfaces', (list) => {
-            const sel = document.getElementById('selectIface'); sel.innerHTML = '';
+            const sel = document.getElementById('selectIface');
+            sel.innerHTML = '';
             list.forEach(i => {
-                const o = document.createElement('option'); o.value = i.name; o.textContent = i.description;
-                if (i.description.toLowerCase().includes('wi-fi')) o.selected = true;
+                const o = document.createElement('option');
+                o.value = i.name; o.textContent = i.description;
+                if (i.description.toLowerCase().includes('wi-fi')) o.selected = true; // ให้เลือก Wi-Fi เป็นค่าเริ่มต้น
                 sel.appendChild(o);
             });
         });
 
-        // ===== LIVE PACKETS =====
         socket.on('update_dashboard', (data) => {
             if (!isSniffing) return;
 
-            // เก็บลงประวัติเสมอ (ก่อน filter)
+            if (myUser && data._user !== myUser.username) 
+                return;
             data._time = new Date().toLocaleTimeString();
             const isEnc = data.encryption && data.encryption.includes('Encrypted');
+
             packetHistory.push(data);
             hUniqueIPs.add(data.src); hUniqueIPs.add(data.dst);
             if (isEnc) hEncCount++; else hPlainCount++;
 
-            // Live filter
             const fp = document.getElementById('filterProto').value;
             const fi = document.getElementById('filterIP').value;
             const fport = document.getElementById('filterPort').value;
@@ -1043,13 +1066,14 @@
             if (fport && data.port.toString() !== fport) return;
             if (fsize && data.size < parseInt(fsize)) return;
 
-            // Add to live table
             const tbody = document.getElementById('packetTableBody');
             const row = tbody.insertRow(0);
             row.onclick = () => showDetail(data);
             const tlsVer = data.protocol.includes('UDP') ? '-' : (data.tls_version || 'N/A');
             const cipher = data.cipher && data.cipher !== 'N/A' ? data.cipher : '-';
             const cert = data.cert && data.cert !== 'N/A' ? data.cert : '-';
+
+            // ถ้าระบบพบว่ามี Alert แฝงมาด้วย เปลี่ยนแถวให้กลายเป็นสีแดง
             const hasAlert = data.alerts && data.alerts.length > 0;
             if (hasAlert) row.classList.add('table-danger');
             const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
@@ -1065,8 +1089,10 @@
                 <td><small>${cipher}</small></td>
                 <td><small>${cert}</small></td>
             `;
+
             if (tbody.rows.length > 50) tbody.deleteRow(50);
 
+            // อัปเดตปริมาณกราฟต่างๆ
             packetCountInSecond++;
             if (isEnc) pieChart.data.datasets[0].data[0]++; else pieChart.data.datasets[0].data[1]++;
             let d1 = pieChart.data.datasets[0].data[0];
@@ -1077,22 +1103,56 @@
             pieChart.data.labels = [`Encrypted ${ep}%`, `Plaintext ${pp}%`];
             pieChart.update('none');
             const idx = getProtoIndex(data.protocol);
-            if (idx >= 0) { barChart.data.datasets[0].data[idx]++; barChart.update('none'); }
+            if (idx >= 0) { 
+                barChart.data.datasets[0].data[idx]++; barChart.update('none'); 
+            }
         });
 
-        // ===== CONTROLS =====
+        socket.on('new_alert', (alert) => {
+            allAlerts.unshift(alert);
+
+            updateAlertStats(); // อัปเดตสถิติตัวเลขในหน้า Alert
+            showToast(alert); // เด้งกรอบ Popup มุมจอเล็กๆ
+            ที
+            const isAlertTabOpen = document.getElementById('tab-alerts').classList.contains('active');
+            if (isAlertTabOpen) { renderAlerts(); }
+        });
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////
+
+        function switchTab(name, btn) {
+            document.querySelectorAll('.user-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.user-tab-content').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + name).classList.add('active');
+
+            if (name === 'history') {
+                renderHistory();
+            }
+            if (name === 'alerts') {
+                renderAlerts();
+            }
+        }
+
+
         document.getElementById('startBtn').addEventListener('click', () => {
-            socket.emit('control_sniffer', { action: 'start', iface: document.getElementById('selectIface').value });
+            socket.emit('control_sniffer',
+                { action: 'start', iface: document.getElementById('selectIface').value });
             isSniffing = true;
             document.getElementById('startBtn').classList.add('d-none');
             document.getElementById('stopBtn').classList.remove('d-none');
         });
+
         document.getElementById('stopBtn').addEventListener('click', () => {
             socket.emit('control_sniffer', { action: 'stop' });
             isSniffing = false;
             document.getElementById('startBtn').classList.remove('d-none');
             document.getElementById('stopBtn').classList.add('d-none');
         });
+
+        //เปลี่ยนที่ดักจับ
         document.getElementById('selectIface').addEventListener('change', () => {
             socket.emit('control_sniffer', { action: 'stop' });
             isSniffing = false;
@@ -1105,29 +1165,23 @@
             const fi = document.getElementById('filterIP').value;
             const fport = document.getElementById('filterPort').value;
             const fsize = document.getElementById('filterMinSize').value;
+
             document.querySelectorAll('#packetTableBody tr').forEach(row => {
                 let show = true;
                 if (fp && !row.cells[1].innerText.includes(fp)) show = false;
                 if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
                 if (fport && row.cells[4].innerText !== fport) show = false;
                 if (fsize && parseInt(row.cells[5].innerText) < parseInt(fsize)) show = false;
+
+                // โชว์หรือซ่อน ขึ้นกับที่หาเจอหรือไม่
                 row.style.display = show ? '' : 'none';
             });
         }
+
         ['filterProto', 'filterIP', 'filterPort', 'filterMinSize'].forEach(id =>
             document.getElementById(id).addEventListener('input', applyLiveFilter)
         );
 
-        setInterval(() => {
-            const now = new Date().toLocaleTimeString();
-            lineChart.data.labels.push(now);
-            lineChart.data.datasets[0].data.push(packetCountInSecond);
-            if (lineChart.data.labels.length > 15) { lineChart.data.labels.shift(); lineChart.data.datasets[0].data.shift(); }
-            lineChart.update();
-            packetCountInSecond = 0;
-        }, 1000);
-
-        // ===== PACKET DETAIL MODAL =====
         function showDetail(data) {
             let detail = JSON.stringify(data, null, 2);
             if (data.cert_issuer || data.cert_subject) {
@@ -1141,30 +1195,30 @@
             new bootstrap.Modal(document.getElementById('packetModal')).show();
         }
 
-        // ===== HISTORY TAB =====
         function renderHistory() {
             const q = document.getElementById('historySearch').value.toLowerCase();
             const filtered = q ? packetHistory.filter(p =>
                 (p.protocol + p.src + p.dst + p.port + (p.cipher || '') + (p.tls_version || '') + (p.cert || '')).toLowerCase().includes(q)
             ) : packetHistory;
 
-            // Update stats
             document.getElementById('hStatTotal').textContent = packetHistory.length;
             document.getElementById('hStatEnc').textContent = hEncCount;
             document.getElementById('hStatPlain').textContent = hPlainCount;
             document.getElementById('hStatIPs').textContent = hUniqueIPs.size;
             document.getElementById('historyCount').textContent = filtered.length + ' records';
 
-            // Render table (last 500, newest first)
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
-            // const slice = filtered.slice(-500).reverse();
-            const slice = filtered.reverse();
+
+            // 500 อัน ย้อนหลังใหม่ไปเก่า
+            const slice = filtered.slice(-500).reverse()
+
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);
                 const isEnc = d.encryption && d.encryption.includes('Encrypted');
                 const hasAlert = d.alerts && d.alerts.length > 0;
+
                 if (hasAlert) row.classList.add('table-danger');
                 const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
                 const displayTime = d._time ? d._time : (d.created_at ? new Date(d.created_at).toLocaleTimeString() : '—');
@@ -1184,128 +1238,33 @@
         }
         document.getElementById('historySearch').addEventListener('input', renderHistory);
 
-        function clearHistory() {
-            if (confirm('ลบประวัติทั้งหมด?')) {
-
-                axios.delete(`${url}/api/packets/me`)
-                    .then(res => {
-
-                        packetHistory = [];
-                        hEncCount = 0;
-                        hPlainCount = 0;
-                        hUniqueIPs.clear();
-
-                        renderHistory();
-
-                        document.getElementById('hStatTotal').textContent = 0;
-                        document.getElementById('hStatEnc').textContent = 0;
-                        document.getElementById('hStatPlain').textContent = 0;
-                        document.getElementById('hStatIPs').textContent = 0;
-
-                    })
-                    .catch(err => console.error("❌ ลบประวัติใน DB Error", err));
-            }
-        }
-
-        // ===== EXPORT =====
-        function exportCSV() {
-            if (!packetHistory.length) return alert('ยังไม่มีข้อมูลให้ export');
-            const h = ['Time', 'Protocol', 'Source', 'Destination', 'Port', 'Size', 'Encryption', 'TLS', 'Cipher', 'Certificate'];
-            const rows = packetHistory.map(d => [
-                d._time || '', d.protocol || '', d.src || '', d.dst || '', d.port || '', d.size || '',
-                d.encryption || '', d.tls_version || '', (d.cipher || '').replace(/,/g, ';'), (d.cert || '').replace(/,/g, ';')
-            ]);
-            const csv = h.join(',') + '\n' + rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
-            downloadFile(csv, 'my_packets.csv', 'text/csv');
-        }
-        function exportJSON() {
-            if (!packetHistory.length) return alert('ยังไม่มีข้อมูลให้ export');
-            const clean = packetHistory.map(d => ({
-                time: d._time, protocol: d.protocol, src: d.src, dst: d.dst, port: d.port, size: d.size,
-                encryption: d.encryption, tls_version: d.tls_version, cipher: d.cipher, cert: d.cert
-            }));
-            downloadFile(JSON.stringify(clean, null, 2), 'my_packets.json', 'application/json');
-        }
-        function downloadFile(content, filename, type) {
-            const blob = new Blob([content], { type });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = filename; a.click(); URL.revokeObjectURL(a.href);
-        }
-
-        // ===== ALERT SYSTEM =====
-        let allAlerts = [];
-        let unackedCount = 0;
-        const SEVERITY_ICON = { CRITICAL: '🔴', HIGH: '🟠', MEDIUM: '🟡', LOW: '🔵' };
-        const TYPE_LABEL = {
-            INSECURE_PROTOCOL: '🔓 Insecure Protocol',
-            WEAK_TLS: '🔐 Weak TLS',
-            CERT_EXPIRY: '📜 Cert Expiry',
-            PORT_SCAN: '🔍 Port Scan',
-            BRUTE_FORCE: '💥 Brute Force',
-            DOS_ATTEMPT: '🌊 DoS Attempt',
-        };
-
-        socket.on('new_alert', (alert) => {
-            allAlerts.unshift(alert);
-            if (!alert.acknowledged) unackedCount++;
-            updateAlertStats();
-            showToast(alert);
-            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
-        });
-
-        socket.on('alert_acknowledged', (alertId) => {
-            const a = allAlerts.find(x => x.id === alertId);
-            if (a && !a.acknowledged) { a.acknowledged = true; unackedCount = Math.max(0, unackedCount - 1); }
-            updateAlertStats();
-            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
-        });
-
-        socket.on('alert_history', (alerts) => {
-            allAlerts = alerts;
-            unackedCount = alerts.filter(a => !a.acknowledged).length;
-            updateAlertStats();
-            renderAlerts();
-        });
-        socket.emit('request_alerts'); // initial fetch
-
+        // 6.3 อัปเดตสถิติแจ้งเตือนช่องดวงบน บนหน้าแท็บ Security Alerts
         function updateAlertStats() {
-            const crit = allAlerts.filter(a => a.severity === 'CRITICAL').length;
-            const high = allAlerts.filter(a => a.severity === 'HIGH').length;
-            const med = allAlerts.filter(a => a.severity === 'MEDIUM').length;
-            const acked = allAlerts.filter(a => a.acknowledged).length;
-            document.getElementById('aStatCrit').textContent = crit;
-            document.getElementById('aStatHigh').textContent = high;
-            document.getElementById('aStatMed').textContent = med;
-            document.getElementById('aStatAck').textContent = acked;
-
-            const badge = document.getElementById('alertTabBadge');
-            if (unackedCount > 0) {
-                badge.textContent = unackedCount > 99 ? '99+' : unackedCount;
-                badge.classList.remove('d-none');
-            } else {
-                badge.classList.add('d-none');
-            }
+            document.getElementById('aStatCrit').textContent = allAlerts.filter(a => a.severity === 'CRITICAL').length;
+            document.getElementById('aStatHigh').textContent = allAlerts.filter(a => a.severity === 'HIGH').length;
+            document.getElementById('aStatMed').textContent = allAlerts.filter(a => a.severity === 'MEDIUM').length;
         }
 
+        // 6.4 วาดตารางหน้าต่าง Security Alerts (เวลาคนมีฟิลเตอร์ด้วย)
         function renderAlerts() {
             const sevFilter = document.getElementById('alertFilterSeverity').value;
             const typeFilter = document.getElementById('alertFilterType').value;
-            const ackFilter = document.getElementById('alertFilterAck').value;
+
             let filtered = allAlerts;
             if (sevFilter) filtered = filtered.filter(a => a.severity === sevFilter);
             if (typeFilter) filtered = filtered.filter(a => a.type === typeFilter);
-            if (ackFilter === 'unacked') filtered = filtered.filter(a => !a.acknowledged);
-            if (ackFilter === 'acked') filtered = filtered.filter(a => a.acknowledged);
 
             document.getElementById('alertCount').textContent = filtered.length + ' alerts';
+
             const tbody = document.getElementById('alertsTableBody');
             tbody.innerHTML = '';
 
             filtered.forEach(a => {
                 const row = tbody.insertRow();
-                if (a.acknowledged) row.style.opacity = '0.45';
+
                 const det = a.details || {};
                 const detStr = Object.entries(det).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
+
                 row.innerHTML = `
                     <td class="text-muted small">${a._time}</td>
                     <td><span class="badge sev-${a.severity}">${SEVERITY_ICON[a.severity]} ${a.severity}</span></td>
@@ -1313,27 +1272,27 @@
                     <td style="font-size:13px;">${a.message}</td>
                     <td style="font-size:12px; color:#0d6efd;">${det.src || '—'}</td>
                     <td style="font-size:11px; color:#6c757d; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${detStr}">${detStr}</td>
-                    <td>${a.acknowledged
-                        ? '<span class="text-success" style="font-size:11px;">✓ Acked</span>'
-                        : `<button class="btn btn-outline-secondary btn-sm" style="padding:2px 8px;font-size:11px;" onclick="ackAlert('${a.id}')">Ack</button>`
-                    }</td>
                 `;
             });
         }
 
-        function ackAlert(id) { socket.emit('acknowledge_alert', id); }
-        function ackAllAlerts() { allAlerts.filter(a => !a.acknowledged).forEach(a => socket.emit('acknowledge_alert', a.id)); }
 
-        let toastQueue = [];
-        let toastShowing = false;
+
+        // 6.6 การควบคุมคิวการแสดง Popup ให้ค่อยๆ เด้งมามุมหน้าจอ (Toast) 
         function showToast(alert) {
             toastQueue.push(alert);
             if (!toastShowing) processToastQueue();
         }
+
         function processToastQueue() {
-            if (!toastQueue.length) { toastShowing = false; return; }
+            if (!toastQueue.length) {
+                toastShowing = false
+                return
+            }
+
             toastShowing = true;
             const a = toastQueue.shift();
+
             const toast = document.createElement('div');
             toast.className = `alert-toast ${a.severity}`;
             toast.innerHTML = `
@@ -1345,10 +1304,58 @@
                 <button class="toast-close" onclick="this.parentElement.remove();processToastQueue()">×</button>
             `;
             document.body.appendChild(toast);
+
             setTimeout(() => {
                 toast.style.animation = 'slideOut .3s ease forwards';
-                setTimeout(() => { toast.remove(); processToastQueue(); }, 300);
+                setTimeout(() => { 
+                    toast.remove(); processToastQueue();
+                }, 300); // ดีไซด์ซ่อนละลบชัวร์
             }, 5000);
+        }
+
+        function clearHistory() {
+            if (confirm('ลบประวัติทั้งหมด?')) {
+                axios.delete(`${url}/api/packets/me`)
+                    .then(res => {
+                        packetHistory = [];
+                        hEncCount = 0; hPlainCount = 0; hUniqueIPs.clear();
+                        renderHistory();
+                        document.getElementById('hStatTotal').textContent = 0;
+                        document.getElementById('hStatEnc').textContent = 0;
+                        document.getElementById('hStatPlain').textContent = 0;
+                        document.getElementById('hStatIPs').textContent = 0;
+                    })
+                    .catch(err => console.error("❌ ลบประวัติใน DB Error", err));
+            }
+        }
+
+        function exportCSV() {
+            if (!packetHistory.length) return alert('ยังไม่มีข้อมูลให้ export');
+            const h = ['Time', 'Protocol', 'Source', 'Destination', 'Port', 'Size', 'Encryption', 'TLS', 'Cipher', 'Certificate'];
+            const rows = packetHistory.map(d => [
+                d._time || '', d.protocol || '', d.src || '', d.dst || '', d.port || '', d.size || '',
+                d.encryption || '', d.tls_version || '', (d.cipher || '').replace(/,/g, ';'), (d.cert || '').replace(/,/g, ';')
+            ]);
+            const csv = h.join(',') + '\n' + rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+            downloadFile(csv, 'my_packets.csv', 'text/csv');
+        }
+
+        function exportJSON() {
+            if (!packetHistory.length) return alert('ยังไม่มีข้อมูลให้ export');
+            const clean = packetHistory.map(d => ({
+                time: d._time, protocol: d.protocol, src: d.src, dst: d.dst, port: d.port, size: d.size,
+                encryption: d.encryption, tls_version: d.tls_version, cipher: d.cipher, cert: d.cert
+            }));
+            downloadFile(JSON.stringify(clean, null, 2), 'my_packets.json', 'application/json');
+        }
+
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
         }
     </script>
 </body>

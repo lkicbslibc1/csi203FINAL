@@ -956,13 +956,9 @@
                 <option value="BRUTE_FORCE">Brute Force</option>
                 <option value="DOS_ATTEMPT">DoS Attempt</option>
             </select>
-            <select id="alertFilterAck" onchange="renderAlerts()">
-                <option value="">All Status</option>
-                <option value="unacked">Unacknowledged</option>
-                <option value="acked">Acknowledged</option>
-            </select>
+
             <div style="flex:1;"></div>
-            <button class="btn-outline" onclick="ackAllAlerts()" style="font-size:12px;">✓ Ack All</button>
+
             <button class="btn-outline" onclick="clearAlerts()"
                 style="font-size:12px;border-color:var(--danger);color:var(--danger);">🗑 Clear</button>
             <span style="color:var(--text-secondary);font-size:13px;" id="alertCount">0 alerts</span>
@@ -979,7 +975,6 @@
                         <th>Message</th>
                         <th>Source</th>
                         <th>Details</th>
-                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="alertsTableBody"></tbody>
@@ -992,8 +987,6 @@
         const url = window.location.origin;
         axios.defaults.withCredentials = true;
         const socket = io(url);
-
-        // ========== AUTH ==========
         let currentOnlineUsers = [];
         let allRegisteredUsers = [];
         let myUser = null;  // เก็บ user info ไว้ส่ง identify ซ้ำได้
@@ -1012,11 +1005,17 @@
             if (selLive) selLive.innerHTML = '<option value="">👥 All Users</option>';
 
             const allNames = new Set();
-            allRegisteredUsers.forEach(u => allNames.add(String(u).trim()));
-            currentOnlineUsers.forEach(u => allNames.add(String(u.username).trim()));
+            allRegisteredUsers.forEach(
+                u => allNames.add(String(u).trim())
+            );
+            currentOnlineUsers.forEach(
+                u => allNames.add(String(u.username).trim())
+            );
             packetHistory.forEach(p => {
                 const u = String(p._user || p.username || '').trim();
-                if (u && u !== 'network' && u !== 'undefined') allNames.add(u);
+                if (u && u !== 'network' && u !== 'undefined') {
+                    allNames.add(u);
+                }
             });
 
             Array.from(allNames).sort().forEach(name => {
@@ -1346,7 +1345,7 @@
         document.getElementById('historySearch').addEventListener('input', renderHistory);
         document.getElementById('historyUserFilter').addEventListener('change', renderHistory);
         function clearHistory() {
-            if (confirm('ท่านแอดมินแน่ใจนะว่าจะล้างประวัติของ "ทุกคน" ทั้งเซิร์ฟเวอร์? หายเกลี้ยงเลยนะเว้ย!')) {
+            if (confirm('คุณต้องการลบประวัติของทุกคนใน server เลยไหม การกระทำนี้ไม่สามารถย้อนกลับได้')) {
 
                 axios.delete(`${url}/api/packets/all`)
                     .then(res => {
@@ -1457,23 +1456,16 @@
 
         socket.on('new_alert', (alert) => {
             allAlerts.unshift(alert);
-            if (!alert.acknowledged) unackedCount++;
             updateAlertStats();
             showToast(alert);
             if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
         });
 
-        socket.on('alert_acknowledged', (alertId) => {
-            const a = allAlerts.find(x => x.id === alertId);
-            if (a && !a.acknowledged) { a.acknowledged = true; unackedCount = Math.max(0, unackedCount - 1); }
-            updateAlertStats();
-            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
-        });
+
 
         // Fetch existing alerts on connect
         socket.on('alert_history', (alerts) => {
             allAlerts = alerts;
-            unackedCount = alerts.filter(a => !a.acknowledged).length;
             updateAlertStats();
             renderAlerts();
         });
@@ -1484,31 +1476,22 @@
             const crit = allAlerts.filter(a => a.severity === 'CRITICAL').length;
             const high = allAlerts.filter(a => a.severity === 'HIGH').length;
             const med = allAlerts.filter(a => a.severity === 'MEDIUM').length;
-            const acked = allAlerts.filter(a => a.acknowledged).length;
             document.getElementById('alertStatTotal').textContent = total;
             document.getElementById('alertStatCrit').textContent = crit;
             document.getElementById('alertStatHigh').textContent = high;
             document.getElementById('alertStatMed').textContent = med;
-            document.getElementById('alertStatAck').textContent = acked;
-            // Tab badge for unacked alerts
-            const badge = document.getElementById('alertTabBadge');
-            if (unackedCount > 0) {
-                badge.textContent = unackedCount > 99 ? '99+' : unackedCount;
-                badge.classList.remove('d-none');
-            } else {
-                badge.classList.add('d-none');
-            }
         }
 
         function renderAlerts() {
             const sevFilter = document.getElementById('alertFilterSeverity').value;
             const typeFilter = document.getElementById('alertFilterType').value;
-            const ackFilter = document.getElementById('alertFilterAck').value;
-            let filtered = allAlerts;
-            if (sevFilter) filtered = filtered.filter(a => a.severity === sevFilter);
-            if (typeFilter) filtered = filtered.filter(a => a.type === typeFilter);
-            if (ackFilter === 'unacked') filtered = filtered.filter(a => !a.acknowledged);
-            if (ackFilter === 'acked') filtered = filtered.filter(a => a.acknowledged);
+            let filtered = allAlerts; //รวมทั้งเซิฟ ละเด้วมาแยกอัน
+            if (sevFilter) {
+                filtered = filtered.filter(a => a.severity === sevFilter);
+            }
+            if (typeFilter) {
+                filtered = filtered.filter(a => a.type === typeFilter);
+            }
 
             document.getElementById('alertCount').textContent = filtered.length + ' alerts';
             const tbody = document.getElementById('alertsTableBody');
@@ -1516,7 +1499,6 @@
 
             filtered.forEach(a => {
                 const row = tbody.insertRow();
-                if (a.acknowledged) row.style.opacity = '0.45';
                 const det = a.details || {};
                 const detStr = Object.entries(det).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
                 row.innerHTML = `
@@ -1526,20 +1508,11 @@
             <td style="font-size:12px">${a.message}</td>
             <td style="font-size:11px;color:var(--accent2)">${det.src || '—'}</td>
             <td style="font-size:10px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${detStr}">${detStr}</td>
-            <td>${a.acknowledged
-                        ? '<span style="color:var(--success);font-size:11px;">✓ Acked</span>'
-                        : `<button class="btn-outline" style="padding:3px 10px;font-size:11px;" onclick="ackAlert('${a.id}')">Ack</button>`
-                    }</td>
         `;
             });
         }
 
-        function ackAlert(id) {
-            socket.emit('acknowledge_alert', id);
-        }
-        function ackAllAlerts() {
-            allAlerts.filter(a => !a.acknowledged).forEach(a => socket.emit('acknowledge_alert', a.id));
-        }
+
         function clearAlerts() {
             if (!confirm('Clear all alerts?')) return;
             allAlerts = [];
@@ -1561,7 +1534,7 @@
             });
         }
 
-        // Toast notifications
+        // การแจ้งเตือน
         let toastQueue = [];
         let toastShowing = false;
         function showToast(alert) {
@@ -1569,7 +1542,9 @@
             if (!toastShowing) processToastQueue();
         }
         function processToastQueue() {
-            if (!toastQueue.length) { toastShowing = false; return; }
+            if (!toastQueue.length) { 
+                toastShowing = false; return 
+            }
             toastShowing = true;
             const a = toastQueue.shift();
             const toast = document.createElement('div');
@@ -1589,10 +1564,7 @@
             }, 5000);
         }
 
-        // Also add 'alerts' to switchTab
         const _origSwitchTab = switchTab;
-        // Patch switchTab to handle alerts tab
-        // (replace the existing switchTab function entirely:)
         function switchTab(name) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
