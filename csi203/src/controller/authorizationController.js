@@ -10,6 +10,7 @@ export const pool = mysql.createPool({
     user: 'root',
     password: '',
     database: 'sniffer_db',
+    timezone: 'Z',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
