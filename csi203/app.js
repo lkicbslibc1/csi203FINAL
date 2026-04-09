@@ -311,19 +311,20 @@ io.on('connection', (socket) => {
     // ส่งข้อมูลแพ็กเก็ต
     socket.on('new_packet', (pkt) => {
         let mappedUser = null;
-        let mappedUsername = 'system/network';
+        let mappedUserId = null;
 
         // ลองหาว่า packet นี้ตรงกับ IP ของ user คนไหนที่ออนไลน์อยู่
         for (const user of onlineUsers.values()) {
             const UserIp = user.ip.replace('::ffff:', '');
             if (pkt.src === UserIp || pkt.dst === UserIp) {
                 mappedUser = user.username;
+                mappedUserId = user.users_id;
                 break;
-
             }
         }
         
         pkt._user = mappedUser;
+        pkt.users_id = mappedUserId;
         
         if (mappedUser === 'network') {
                     return;
