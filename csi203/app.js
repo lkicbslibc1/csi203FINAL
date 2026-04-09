@@ -310,17 +310,23 @@ io.on('connection', (socket) => {
 
     // ส่งคำสั่ง Start/Stop
     socket.on('control_sniffer', (data) => {
-        const user = onlineUsers.get(socket.id); //ไปเอาidของuser ถ่า้ใช้ip มันบัคได้เวลาเปิดหลายแท้บ
+        const user = onlineUsers.get(socket.id); 
         if (user && data.action === 'start') {
-            let who = '';
-            if (user.role === 'admin') {
-                who = ''; // Admin sniffs everything
-            } else {
-                who = `host ${user.ip}`;
+            let customFilter = (data.filter || '').trim();
+            let forcedFilter = '';
+            
+            if (user.role !== 'admin') {
+                forcedFilter = `host ${user.ip}`;
             }
-            data.filter = who;
+            
+            // ผสานคำสั่งกรองที่ส่งมาจากหน้าเว็บเข้ากับเงื่อนไขบังคับของระบบ และยกเว้นพอร์ตที่เป็น traffic ของระบบเอง
+            const excludePorts = "not port 3000 and not port 3306";
+            if (forcedFilter) {
+                data.filter = customFilter ? `(${customFilter}) and (${forcedFilter}) and (${excludePorts})` : `(${forcedFilter}) and (${excludePorts})`;
+            } else {
+                data.filter = customFilter ? `(${customFilter}) and (${excludePorts})` : excludePorts;
+            }
         }
-        console.log(data)
         console.log('คำสั่ง:', data.action, 'บน:', data.iface, 'Filter:', data.filter || 'None');
         io.emit('control_sniffer', data);
     });

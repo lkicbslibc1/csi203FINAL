@@ -1138,8 +1138,19 @@
 
 
         document.getElementById('startBtn').addEventListener('click', () => {
-            socket.emit('control_sniffer',
-                { action: 'start', iface: document.getElementById('selectIface').value });
+            const iface = document.getElementById('selectIface').value;
+            const fp = document.getElementById('filterProto').value;
+
+            // แปลงโปรโตคอลที่เลือกเป็น BPF Filter
+            let bpf = '';
+            if (fp === 'TCP') bpf = 'tcp';
+            else if (fp === 'UDP') bpf = 'udp';
+            else if (fp === 'HTTP') bpf = 'tcp port 80';
+            else if (fp === 'HTTPS') bpf = 'tcp port 443';
+            else if (fp === 'DNS') bpf = 'port 53';
+            else if (fp === 'QUIC') bpf = 'udp port 443';
+
+            socket.emit('control_sniffer', { action: 'start', iface, filter: bpf });
             isSniffing = true;
             document.getElementById('startBtn').classList.add('d-none');
             document.getElementById('stopBtn').classList.remove('d-none');
@@ -1167,11 +1178,26 @@
             const fsize = document.getElementById('filterMinSize').value;
 
             document.querySelectorAll('#packetTableBody tr').forEach(row => {
+                const packetProto = row.cells[1].innerText.trim().toLowerCase();
+                const packetIP = (row.cells[2].innerText + row.cells[3].innerText).toLowerCase();
+                const packetPort = row.cells[4].innerText.trim().toLowerCase();
+                const packetSize = parseInt(row.cells[5].innerText);
+
                 let show = true;
-                if (fp && !row.cells[1].innerText.includes(fp)) show = false;
-                if (fi && !row.cells[2].innerText.includes(fi) && !row.cells[3].innerText.includes(fi)) show = false;
-                if (fport && row.cells[4].innerText !== fport) show = false;
-                if (fsize && parseInt(row.cells[5].innerText) < parseInt(fsize)) show = false;
+                if (fp) {
+                    const fpLower = fp.toLowerCase();
+                    if (fpLower === 'tcp') {
+                        if (!packetProto.includes('tcp') && !packetProto.includes('http') && !packetProto.includes('https')) show = false;
+                    } else if (fpLower === 'udp') {
+                        if (!packetProto.includes('udp') && !packetProto.includes('dns') && !packetProto.includes('quic')) show = false;
+                    } else {
+                        if (!packetProto.includes(fpLower)) show = false;
+                    }
+                }
+                
+                if (fi && !packetIP.includes(fi.toLowerCase())) show = false;
+                if (fport && packetPort !== fport) show = false;
+                if (fsize && packetSize < parseInt(fsize)) show = false;
 
                 // โชว์หรือซ่อน ขึ้นกับที่หาเจอหรือไม่
                 row.style.display = show ? '' : 'none';

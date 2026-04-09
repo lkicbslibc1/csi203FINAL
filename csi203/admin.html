@@ -1252,7 +1252,18 @@
         // ========== CONTROLS ==========
         function startSniff() {
             const iface = document.getElementById('selectIface').value;
-            socket.emit('control_sniffer', { action: 'start', iface });
+            const fp = document.getElementById('filterProto').value;
+            
+            // แปลงโปรโตคอลที่เลือกเป็น BPF Filter เบื้องต้นเพื่อให้ Sniffer ทำงานเฉพาะเจาะจงมากขึ้น
+            let bpf = '';
+            if (fp === 'TCP') bpf = 'tcp';
+            else if (fp === 'UDP') bpf = 'udp';
+            else if (fp === 'HTTP') bpf = 'tcp port 80';
+            else if (fp === 'HTTPS') bpf = 'tcp port 443';
+            else if (fp === 'DNS') bpf = 'port 53';
+            else if (fp === 'QUIC') bpf = 'udp port 443';
+
+            socket.emit('control_sniffer', { action: 'start', iface, filter: bpf });
             isSniffing = true;
             document.getElementById('startBtn').classList.add('d-none');
             document.getElementById('stopBtn').classList.remove('d-none');
@@ -1290,11 +1301,29 @@
                 const fi = document.getElementById('filterIP').value.trim().toLowerCase();
                 const fport = document.getElementById('filterPort').value.trim().toLowerCase();
 
+                const packetUser = row.cells[1].textContent.trim().toLowerCase();
+                const packetProto = row.cells[2].textContent.trim().toLowerCase();
+                const packetIP = (row.cells[3].textContent + row.cells[4].textContent).toLowerCase();
+                const packetPort = row.cells[5].textContent.trim().toLowerCase();
+
                 let show = true;
-                if (fUser && row.cells[1].textContent.trim().toLowerCase() !== fUser) show = false;
-                if (fp && !row.cells[2].textContent.trim().toLowerCase().includes(fp)) show = false;
-                if (fi && !row.cells[3].textContent.trim().toLowerCase().includes(fi) && !row.cells[4].textContent.trim().toLowerCase().includes(fi)) show = false;
-                if (fport && row.cells[5].textContent.trim().toLowerCase() !== fport) show = false;
+                if (fUser && packetUser !== fUser) show = false;
+                
+                // ปรับปรุงการกรองโปรโตคอลให้รวมกลุ่มโปรโตคอลที่เกี่ยวข้องกัน
+                if (fp) {
+                    if (fp === 'tcp') {
+                        // ถ้าเลือก TCP ให้แสดง HTTP, HTTPS และตัวที่ชื่อมีคำว่า TCP
+                        if (!packetProto.includes('tcp') && !packetProto.includes('http') && !packetProto.includes('https')) show = false;
+                    } else if (fp === 'udp') {
+                        // ถ้าเลือก UDP ให้แสดง DNS, QUIC และตัวที่ชื่อมีคำว่า UDP
+                        if (!packetProto.includes('udp') && !packetProto.includes('dns') && !packetProto.includes('quic')) show = false;
+                    } else {
+                        if (!packetProto.includes(fp)) show = false;
+                    }
+                }
+                
+                if (fi && !packetIP.includes(fi)) show = false;
+                if (fport && packetPort !== fport) show = false;
 
                 row.style.display = show ? '' : 'none';
             });
