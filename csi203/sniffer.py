@@ -329,11 +329,7 @@ def analyze_packet(packet):
             elif port == 80 or sport == 80:
                 proto = "HTTP"
             elif port == 443 or sport == 443:
-                # ====================================================
-                # ตรวจจับ TLS แบบครบถ้วน
-                # ====================================================
-                
-                # Step 1: ดึง raw bytes ของ TCP payload
+                # ดึง raw bytes ของ TCP payload
                 # เนื่องจาก bind_layers(TCP, TLS) ทำให้ Scapy แปลง Raw → TLS layer
                 # ดังนั้น Raw layer อาจหายไป → ต้องใช้ bytes(packet[TCP].payload) แทน
                 tcp_payload = bytes(packet[TCP].payload)
@@ -467,14 +463,17 @@ def analyze_packet(packet):
         print(f"❌ analyze_packet error: {e}")
 
 
-def start_capture(interface):
+def start_capture(interface, bpf_filter=""):
     global stats_thread_started
     if not stats_thread_started:
         threading.Thread(target=emit_network_stats, daemon=True).start()
         stats_thread_started = True
     try:
-        print(f"🚀 Starting capture on: {interface}")
-        sniff(iface=interface, prn=analyze_packet, stop_filter=lambda p: stop_event.is_set(), store=0)
+        print(f"🚀 Starting capture on: {interface} | Filter: {bpf_filter}")
+        if bpf_filter:
+            sniff(iface=interface, filter=bpf_filter, prn=analyze_packet, stop_filter=lambda p: stop_event.is_set(), store=0)
+        else:
+            sniff(iface=interface, prn=analyze_packet, stop_filter=lambda p: stop_event.is_set(), store=0)
     except Exception as e:
         print(f"❌ Capture Error: {e}")
 
@@ -496,12 +495,13 @@ def connect():
 def on_control(data):
     global sniff_thread
     if data['action'] == 'start':
-        print(f"🚀 เริ่มดักจับบน: {data['iface']}")
+        ip_filter = data.get('filter', '')
+        print(f"เริ่มดักจับบน: {data['iface']} | IP: {ip_filter}")
         stop_event.clear()
-        sniff_thread = threading.Thread(target=start_capture, args=(data['iface'],))
+        sniff_thread = threading.Thread(target=start_capture, args=(data['iface'], ip_filter))
         sniff_thread.start()
     elif data['action'] == 'stop':
-        print("🛑 หยุดดักจับ...")
+        print("หยุดดักจับ...")
         stop_event.set()
 
 
