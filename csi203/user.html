@@ -1164,10 +1164,10 @@
                 const hasAlert = d.alerts && d.alerts.length > 0;
                 if (hasAlert) row.classList.add('table-danger');
                 const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
-
+                const displayTime = d._time ? d._time : (d.created_at ? new Date(d.created_at).toLocaleTimeString() : '—');
                 row.innerHTML = `
                     <td class="text-muted">${filtered.length - i}</td>
-                    <td>${d._time || '—'}</td>
+                    <td>${displayTime}</td>
                     <td><span class="badge ${isEnc ? 'bg-success' : 'bg-secondary'}">${alertIcon}${d.protocol}</span></td>
                     <td>${d.src}</td><td>${d.dst}</td>
                     <td class="text-primary fw-bold">${d.port || '-'}</td>

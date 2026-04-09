@@ -15,7 +15,8 @@ const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
     password: '',
-    database: 'sniffer_db'
+    database: 'sniffer_db',
+    timezone: 'Z',
 });
 
 db.connect((err) => {

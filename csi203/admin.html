@@ -1173,7 +1173,7 @@
             data._time = new Date().toLocaleTimeString();
             data._ts = Date.now();
             data._user = data._user || 'network';
-            packetHistory.push(data);
+            packetHistory.unshift(data);
 
             // Stats (อัพเดทเสมอ)
             totalPkts++;
@@ -1314,7 +1314,7 @@
             );
             document.getElementById('historyCount').textContent = filtered.length + ' records';
 
-            const slice = filtered.slice(-500).reverse();
+            const slice = filtered.slice(0, 500);
             // const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
@@ -1323,10 +1323,10 @@
                 const hasAlert = d.alerts && d.alerts.length > 0;
                 if (hasAlert) row.style.background = 'rgba(239, 68, 68, 0.15)';
                 const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
-
+                const displayTime = d._time ? d._time : (d.created_at ? new Date(d.created_at).toLocaleTimeString() : '—');
                 row.innerHTML = `
             <td style="color:var(--text-secondary)">${filtered.length - i}</td>
-            <td>${d._time || '—'}</td>
+            <td style="color:var(--text-secondary)">${displayTime}</td>
             <td><span style="color:var(--accent);font-size:11px">${d._user || d.username || '—'}</span></td>
             <td><span class="badge-proto ${getProtoBadge(d.protocol)}">${alertIcon}${d.protocol}</span></td>
             <td>${d.src}</td><td>${d.dst}</td>
