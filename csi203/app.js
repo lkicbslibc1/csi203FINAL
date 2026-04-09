@@ -329,14 +329,14 @@ io.on('connection', (socket) => {
                     return;
                 }
         analyzePacketForAlerts(pkt);
-        const sql = `INSERT INTO packets (username, protocol, src, dst, port, size, encryption, cipher, cert, tls_version, handshake_type, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const sql = `INSERT INTO packets (protocol, src, dst, port, size, encryption, cipher, cert, tls_version, handshake_type, payload, users_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         const safePort = (pkt.port === '-' || isNaN(pkt.port)) ? 0 : pkt.port;
 
         const values = [
-            pkt._user,
+            
             pkt.protocol, pkt.src, pkt.dst, safePort, pkt.size,
             pkt.encryption, pkt.cipher, pkt.cert, pkt.tls_version,
-            pkt.handshake_type, pkt.payload
+            pkt.handshake_type, pkt.payload, pkt.users_id
         ];
         db.query(sql, values, (err, result) => {
             if (err) console.error("❌Insert ไม่เข้า:", err);
@@ -393,6 +393,7 @@ app.get('/api/history', verifyToken, (req, res) => {
         });
     } else {
         const loggedInUser = req.user.users_id;
+        console.log(loggedInUser)
         const sql = `
             SELECT packets.*, users.username 
             FROM packets 
