@@ -1095,15 +1095,15 @@
         Chart.defaults.borderColor = 'rgba(42,51,82,.5)';
         const lineChart = new Chart(document.getElementById('lineChart'), {
             type: 'line', data: { labels: [], datasets: [{ label: 'Packets/sec', data: [], borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,.1)', fill: true, tension: .4, pointRadius: 2 }] },
-            options: { animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
+            options: { animation: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
         });
         const pieChart = new Chart(document.getElementById('pieChart'), {
-            type: 'doughnut', data: { labels: ['Encrypted', 'Plaintext'], datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
+            type: 'doughnut', data: { labels: ['Encrypted 0%', 'Plaintext 0%'], datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
             options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8 } } } }
         });
         const barChart = new Chart(document.getElementById('barChart'), {
             type: 'bar', data: { labels: ['TCP', 'UDP', 'DNS', 'HTTP', 'HTTPS', 'QUIC'], datasets: [{ label: 'Count', data: [0, 0, 0, 0, 0, 0], backgroundColor: ['#6366f1', '#f59e0b', '#22d3ee', '#fb923c', '#10b981', '#a855f7'], borderRadius: 4 }] },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
+            options: { plugins: { legend: { display: false } }, scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
         });
 
         function getProtoIndex(p) {
@@ -1188,6 +1188,10 @@
             document.getElementById('statPlain').textContent = plainCount;
 
             // Pie
+            let tp = encCount + plainCount;
+            let ep = tp ? Math.round((encCount / tp) * 100) : 0;
+            let pp = tp ? Math.round((plainCount / tp) * 100) : 0;
+            pieChart.data.labels = [`Encrypted ${ep}%`, `Plaintext ${pp}%`];
             pieChart.data.datasets[0].data = [encCount, plainCount];
             pieChart.update('none');
 
@@ -1360,6 +1364,7 @@
                         document.getElementById('statIPs').textContent = 0;
 
                         pieChart.data.datasets[0].data = [0, 0];
+                        pieChart.data.labels = ['Encrypted 0%', 'Plaintext 0%'];
                         pieChart.update('none');
                     })
                     .catch(err => console.error("❌ ลบประวัติไม่สำเร็จ!", err));

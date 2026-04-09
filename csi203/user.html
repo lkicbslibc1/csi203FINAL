@@ -760,16 +760,13 @@
             <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:24px;margin-bottom:24px;">
                 <div class="chart-container"
                     style="margin-bottom:0; padding:20px; display:flex; justify-content:center; align-items:center;">
-                    <canvas id="lineChart"></canvas>
-                </div>
+                    <canvas id="lineChart"></canvas></div>
                 <div class="chart-container"
                     style="margin-bottom:0; padding:20px; display:flex; justify-content:center; align-items:center;">
-                    <canvas id="pieChart"></canvas>
-                </div>
+                    <canvas id="pieChart"></canvas></div>
                 <div class="chart-container"
                     style="margin-bottom:0; padding:20px; display:flex; justify-content:center; align-items:center;">
-                    <canvas id="barChart"></canvas>
-                </div>
+                    <canvas id="barChart"></canvas></div>
             </div>
             <div class="row">
                 <div class="col-12">
@@ -997,9 +994,9 @@
         let hUniqueIPs = new Set();
 
         // ===== CHARTS =====
-        const lineChart = new Chart(document.getElementById('lineChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Packets/sec', data: [], borderColor: '#0d6efd', tension: .4 }] }, options: { animation: false } });
-        const pieChart = new Chart(document.getElementById('pieChart'), { type: 'doughnut', data: { labels: ['Encrypted', 'Plaintext'], datasets: [{ data: [0, 0], backgroundColor: ['#198754', '#dc3545'] }] } });
-        const barChart = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: ['TCP', 'UDP', 'ICMP', 'DNS', 'HTTP', 'HTTPS', 'QUIC'], datasets: [{ label: 'Counts', data: [0, 0, 0, 0, 0, 0, 0], backgroundColor: '#6c757d' }] } });
+        const lineChart = new Chart(document.getElementById('lineChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Packets/sec', data: [], borderColor: '#0d6efd', tension: 0.4 }] }, options: { animation: false, scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 } } } } });
+        const pieChart = new Chart(document.getElementById('pieChart'), { type: 'doughnut', data: { labels: ['Encrypted 0%', 'Plaintext 0%'], datasets: [{ data: [0, 0], backgroundColor: ['#198754', '#dc3545'] }] } });
+        const barChart = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: ['TCP', 'UDP', 'ICMP', 'DNS', 'HTTP', 'HTTPS', 'QUIC'], datasets: [{ label: 'Counts', data: [0, 0, 0, 0, 0, 0, 0], backgroundColor: '#6c757d' }] }, options: { scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 } } } } });
         let packetCountInSecond = 0;
 
         function getProtoIndex(proto) {
@@ -1072,6 +1069,12 @@
 
             packetCountInSecond++;
             if (isEnc) pieChart.data.datasets[0].data[0]++; else pieChart.data.datasets[0].data[1]++;
+            let d1 = pieChart.data.datasets[0].data[0];
+            let d2 = pieChart.data.datasets[0].data[1];
+            let tp = d1 + d2;
+            let ep = tp ? Math.round((d1 / tp) * 100) : 0;
+            let pp = tp ? Math.round((d2 / tp) * 100) : 0;
+            pieChart.data.labels = [`Encrypted ${ep}%`, `Plaintext ${pp}%`];
             pieChart.update('none');
             const idx = getProtoIndex(data.protocol);
             if (idx >= 0) { barChart.data.datasets[0].data[idx]++; barChart.update('none'); }
