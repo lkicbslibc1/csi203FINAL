@@ -41,7 +41,7 @@ CREATE TABLE `packets` (
   `handshake_type` varchar(50) DEFAULT NULL,
   `payload` text,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `username` varchar(50) DEFAULT NULL
+  `users_id` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --

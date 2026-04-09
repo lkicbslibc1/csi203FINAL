@@ -12,10 +12,11 @@ import os from 'os';
 import mysql from 'mysql2';
 
 const db = mysql.createConnection({
-    host: process.env.DB_HOST || '127.0.0.1',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DATABASE || 'sniffer_db'
+    host: 'localhost',
+    user: 'root',
+    password: '',
+    database: 'sniffer_db',
+    timezone: 'Z',
 });
 
 db.connect((err) => {
@@ -28,8 +29,6 @@ db.connect((err) => {
 const host = '0.0.0.0'
 const port = 3000
 const SECRET_KEY = process.env.JWT_SECRET;
-// ===== ALERT SYSTEM =====
-// Add these after your onlineUsers Map declaration
 
 const alertHistory = [];
 const portScanTracker = new Map();   // srcIP -> { ports: Set, firstSeen: timestamp }
@@ -56,17 +55,16 @@ function createAlert(type, severity, message, details = {}) {
     const alert = {
         id: Date.now() + Math.random().toString(36).slice(2),
         type,
-        severity,   // CRITICAL | HIGH | MEDIUM | LOW
+        severity,
         message,
         details,
         timestamp: new Date().toISOString(),
         _time: new Date().toLocaleTimeString(),
-        acknowledged: false,
     };
     alertHistory.unshift(alert);
     if (alertHistory.length > 200) alertHistory.pop();
     io.emit('new_alert', alert);
-    console.log(`🚨 [${severity}] ${type}: ${message}`);
+    console.log(`เจอ [${severity}] ${type}: ${message}`);
     return alert;
 }
 const alertCooldowns = new Map();
@@ -84,7 +82,6 @@ function analyzePacketForAlerts(pkt) {
     const port = parseInt(pkt.port);
     const proto = pkt.protocol || '';
 
-    // Insecure Protocol Detection
     if (INSECURE_PORTS[port]) {
         const { name, severity } = INSECURE_PORTS[port];
         pkt.alerts.push({ type: 'INSECURE_PROTOCOL', severity });
@@ -111,7 +108,6 @@ function analyzePacketForAlerts(pkt) {
         }
     }
 
-    // 3. Certificate Expiry Check
     if (pkt.cert_not_after && pkt.cert_not_after !== 'N/A') {
         try {
             const expiry = new Date(pkt.cert_not_after);
@@ -129,15 +125,13 @@ function analyzePacketForAlerts(pkt) {
             }
         } catch (e) { }
     }
-
-    // 4. Port Scan Detection
+//ไอพีเดียวสุ่มมาหลายพอร์ตไหม
     if (port && src) {
         const now = Date.now();
         if (!portScanTracker.has(src)) {
             portScanTracker.set(src, { ports: new Set(), firstSeen: now });
         }
         const tracker = portScanTracker.get(src);
-        // Reset window if expired
         if (now - tracker.firstSeen > ALERT_THRESHOLDS.portScanWindowMs) {
             tracker.ports = new Set();
             tracker.firstSeen = now;
@@ -158,7 +152,7 @@ function analyzePacketForAlerts(pkt) {
         }
     }
 
-    // 5. Brute Force Detection (SSH port 22, RDP port 3389)
+    // Brute Force Detection (SSH port 22, RDP port 3389)
     if ((port === 22 || port === 3389) && src) {
         const key = `${src}:${port}`;
         const now = Date.now();
@@ -217,18 +211,7 @@ setInterval(() => {
         if (now - t.firstSeen > 60000) bruteForceTracker.delete(key);
     }
 }, 60000);
-// เก็บรายชื่อ IP ทั้งหมดของเครื่อง Server เอง เพื่อใช้เทียบกรณีคนเทสผ่าน localhost
-function getLocalIps() {
-    const interfaces = os.networkInterfaces();
-    const ips = ['127.0.0.1', '::1'];
-    for (const name of Object.keys(interfaces)) {
-        for (const iface of interfaces[name]) {
-            ips.push(iface.address);
-        }
-    }
-    return ips;
-}
-const localIps = getLocalIps();
+
 
 const app = express()
 const server = http.createServer(app);
@@ -244,12 +227,8 @@ app.use(cookieParser());
 app.use(express.static('.'));
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (like mobile apps or curl)
         if (!origin) return callback(null, true);
-
-        // Allow localhost and any origin during development
-        // In production, you'd want to be more specific
-        callback(null, true);
+        callback(null, true); 
     },
     credentials: true
 }));
@@ -273,18 +252,15 @@ io.on('connection', (socket) => {
             if (clientIp.startsWith('::ffff:')) {
                 clientIp = clientIp.substring(7);
             }
-            if (clientIp === '::1') {
-                clientIp = '127.0.0.1'; // จัดการกรณีเทสในเครื่องตัวเอง
-            }
-
             onlineUsers.set(socket.id, {
+                users_id: data.users_id,
                 username: data.username,
                 role: data.role || 'user',
                 connectedAt: new Date().toISOString(),
                 socketId: socket.id,
                 ip: clientIp
             });
-            console.log(`✅ User identified: ${data.username} (${data.role}) from IP: ${clientIp}`);
+            // console.log(`✅ User identified: ${data.users_id} ${data.username} (${data.role}) from IP: ${clientIp}`);
             broadcastOnlineUsers();
         }
     });
@@ -305,47 +281,63 @@ io.on('connection', (socket) => {
 
     // รับคำขอรายชื่อจากหน้าเว็บ แล้วถาม Python
     socket.on('request_interfaces', () => {
-        console.log('🔍 หน้าเว็บขอรายชื่อ... กำลังถาม Python');
+        console.log('หน้าเว็บขอรายชื่อ... ');
         io.emit('request_interfaces');
     });
 
     // รับรายชื่อจาก Python แล้วส่งให้หน้าเว็บ
     socket.on('available_interfaces', (interfaces) => {
-        console.log('📡 ได้รับรายชื่อจาก Python แล้วส่งต่อให้ Web');
+        console.log('ได้รับรายชื่อจาก Python แล้วส่งต่อให้ Web');
         io.emit('available_interfaces', interfaces);
     });
 
     // ส่งคำสั่ง Start/Stop
     socket.on('control_sniffer', (data) => {
-        console.log('🎮 คำสั่ง:', data.action, 'บน:', data.iface);
+        const user = onlineUsers.get(socket.id); //ไปเอาidของuser ถ่า้ใช้ip มันบัคได้เวลาเปิดหลายแท้บ
+        if (user && data.action === 'start') {
+            let who = '';
+            if (user.role === 'admin') {
+                who = ''; // Admin sniffs everything
+            } else {
+                who = `host ${user.ip}`;
+            }
+            data.filter = who;
+        }
+        console.log(data)
+        console.log('คำสั่ง:', data.action, 'บน:', data.iface, 'Filter:', data.filter || 'None');
         io.emit('control_sniffer', data);
     });
 
     // ส่งข้อมูลแพ็กเก็ต
     socket.on('new_packet', (pkt) => {
-        let mappedUser = 'network';
+        let mappedUser = null;
+        let mappedUserId = null;
 
         // ลองหาว่า packet นี้ตรงกับ IP ของ user คนไหนที่ออนไลน์อยู่
         for (const user of onlineUsers.values()) {
-            // ถ้userต่อเข้าทาง localhost ให้เหมาว่าไอพีเครื่อง เป็นของคนนี้
-            const userIps = (user.ip === '127.0.0.1' || user.ip === '::1') ? localIps : [user.ip];
-            if (userIps.includes(pkt.src) || userIps.includes(pkt.dst)) {
+            const UserIp = user.ip.replace('::ffff:', '');
+            if (pkt.src === UserIp || pkt.dst === UserIp) {
                 mappedUser = user.username;
+                mappedUserId = user.users_id;
                 break;
             }
         }
-
+        
         pkt._user = mappedUser;
+        pkt.users_id = mappedUserId;
+        
+        if (mappedUser === 'network') {
+                    return;
+                }
         analyzePacketForAlerts(pkt);
-
-        const sql = `INSERT INTO packets (username, protocol, src, dst, port, size, encryption, cipher, cert, tls_version, handshake_type, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const sql = `INSERT INTO packets (protocol, src, dst, port, size, encryption, cipher, cert, tls_version, handshake_type, payload, users_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
         const safePort = (pkt.port === '-' || isNaN(pkt.port)) ? 0 : pkt.port;
 
         const values = [
-            pkt._user,
+            
             pkt.protocol, pkt.src, pkt.dst, safePort, pkt.size,
             pkt.encryption, pkt.cipher, pkt.cert, pkt.tls_version,
-            pkt.handshake_type, pkt.payload
+            pkt.handshake_type, pkt.payload, pkt.users_id
         ];
         db.query(sql, values, (err, result) => {
             if (err) console.error("❌Insert ไม่เข้า:", err);
@@ -354,13 +346,7 @@ io.on('connection', (socket) => {
         io.emit('update_dashboard', pkt);
     });
 
-    socket.on('acknowledge_alert', (alertId) => {
-        const alert = alertHistory.find(a => a.id === alertId);
-        if (alert) {
-            alert.acknowledged = true;
-            io.emit('alert_acknowledged', alertId);
-        }
-    });
+
 
     socket.on('network_stats', (stats) => {
         io.emit('network_stats', stats);
@@ -374,23 +360,50 @@ app.use('/auth', authorization);
 app.get('/alerts', (req, res) => res.json(alertHistory));
 app.put('/alerts/thresholds', (req, res) => {
     const { packetRatePerSec, portScanCount, bruteForceCount, certExpiryWarningDays } = req.body;
-    if (packetRatePerSec) ALERT_THRESHOLDS.packetRatePerSec = packetRatePerSec;
-    if (portScanCount) ALERT_THRESHOLDS.portScanCount = portScanCount;
-    if (bruteForceCount) ALERT_THRESHOLDS.bruteForceCount = bruteForceCount;
-    if (certExpiryWarningDays) ALERT_THRESHOLDS.certExpiryWarningDays = certExpiryWarningDays;
+    if (packetRatePerSec) 
+        {
+            ALERT_THRESHOLDS.packetRatePerSec = packetRatePerSec;
+        }
+    if (portScanCount) 
+        {
+            ALERT_THRESHOLDS.portScanCount = portScanCount;
+        }
+    if (bruteForceCount) 
+        {
+            ALERT_THRESHOLDS.bruteForceCount = bruteForceCount;
+        }
+    if (certExpiryWarningDays) 
+        {
+            ALERT_THRESHOLDS.certExpiryWarningDays = certExpiryWarningDays;
+        }
     res.json({ success: true, thresholds: ALERT_THRESHOLDS });
 });
 
 // ดึงประวัติการใช้งาน ของแอดมิน (ดึงข้อมูลทั้งหมดของทุกคน)
 app.get('/api/history', verifyToken, (req, res) => {
     if (req.user.role === 'admin') {
-        db.query('SELECT * FROM packets ORDER BY id DESC', (err, results) => {
+        const sql = `
+            SELECT packets.*, users.username 
+            FROM packets 
+            LEFT JOIN users ON packets.users_id = users.users_id 
+            ORDER BY packets.id DESC
+        `;
+        db.query(sql, (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });
     } else {
-        const loggedInUser = req.user.username;
-        db.query('SELECT * FROM packets WHERE username = ? ORDER BY id DESC LIMIT 500', [loggedInUser], (err, results) => {
+        const loggedInUser = req.user.users_id;
+        console.log(loggedInUser)
+        const sql = `
+            SELECT packets.*, users.username 
+            FROM packets 
+            LEFT JOIN users ON packets.users_id = users.users_id 
+            WHERE packets.users_id = ? 
+            ORDER BY packets.id DESC 
+            LIMIT 500
+        `;
+        db.query(sql, [loggedInUser], (err, results) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json(results);
         });
@@ -403,9 +416,9 @@ app.get('/api/packets/count', (req, res) => {
     });
 });
 app.delete('/api/packets/me', verifyToken, (req, res) => {
-    const loggedInUser = req.user.username;
+    const loggedInUser = req.user.users_id;
 
-    const sql = 'DELETE FROM packets WHERE username = ?';
+    const sql = 'DELETE FROM packets WHERE users_id = ?';
 
     db.query(sql, [loggedInUser], (err, result) => {
         if (err) return res.status(500).json({ error: err.message });

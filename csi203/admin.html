@@ -60,8 +60,24 @@
             backdrop-filter: blur(20px);
             box-shadow: 0 0 30px rgba(250, 204, 21, 0.4), inset 0 -2px 10px rgba(250, 204, 21, 0.2);
         }
-        @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        canvas { filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.5)); }
+
+        @keyframes gradientMove {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        canvas {
+            filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.5));
+        }
 
         .admin-nav .brand {
             font-size: 20px;
@@ -228,12 +244,15 @@
             vertical-align: middle;
         }
 
-        .table-dark-custom tr { transition: all 0.2s ease; }
+        .table-dark-custom tr {
+            transition: all 0.2s ease;
+        }
+
         .table-dark-custom tr:hover td {
             background: rgba(250, 204, 21, .1) !important;
             box-shadow: inset 0 0 15px rgba(250, 204, 21, 0.2);
             cursor: pointer;
-            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
         }
 
         .table-scroll {
@@ -945,13 +964,9 @@
                 <option value="BRUTE_FORCE">Brute Force</option>
                 <option value="DOS_ATTEMPT">DoS Attempt</option>
             </select>
-            <select id="alertFilterAck" onchange="renderAlerts()">
-                <option value="">All Status</option>
-                <option value="unacked">Unacknowledged</option>
-                <option value="acked">Acknowledged</option>
-            </select>
+
             <div style="flex:1;"></div>
-            <button class="btn-outline" onclick="ackAllAlerts()" style="font-size:12px;">✓ Ack All</button>
+
             <button class="btn-outline" onclick="clearAlerts()"
                 style="font-size:12px;border-color:var(--danger);color:var(--danger);">🗑 Clear</button>
             <span style="color:var(--text-secondary);font-size:13px;" id="alertCount">0 alerts</span>
@@ -968,7 +983,6 @@
                         <th>Message</th>
                         <th>Source</th>
                         <th>Details</th>
-                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="alertsTableBody"></tbody>
@@ -981,8 +995,6 @@
         const url = window.location.origin;
         axios.defaults.withCredentials = true;
         const socket = io(url);
-
-        // ========== AUTH ==========
         let currentOnlineUsers = [];
         let allRegisteredUsers = [];
         let myUser = null;  // เก็บ user info ไว้ส่ง identify ซ้ำได้
@@ -1001,11 +1013,17 @@
             if (selLive) selLive.innerHTML = '<option value="">👥 All Users</option>';
 
             const allNames = new Set();
-            allRegisteredUsers.forEach(u => allNames.add(String(u).trim()));
-            currentOnlineUsers.forEach(u => allNames.add(String(u.username).trim()));
+            allRegisteredUsers.forEach(
+                u => allNames.add(String(u).trim())
+            );
+            currentOnlineUsers.forEach(
+                u => allNames.add(String(u.username).trim())
+            );
             packetHistory.forEach(p => {
                 const u = String(p._user || p.username || '').trim();
-                if (u && u !== 'network' && u !== 'undefined') allNames.add(u);
+                if (u && u !== 'network' && u !== 'undefined') {
+                    allNames.add(u);
+                }
             });
 
             Array.from(allNames).sort().forEach(name => {
@@ -1024,7 +1042,7 @@
                 const res = await axios.get(`${url}/auth/me`);
                 if (res.data.user.role !== 'admin') { window.location.href = 'user.html'; return; }
                 document.getElementById('adminUsername').textContent = res.data.user.username;
-                myUser = { username: res.data.user.username, role: 'admin' };
+                myUser = { users_id: res.data.user.users_id, username: res.data.user.username, role: 'admin' };
                 // ถ้า socket connected แล้ว → ส่ง identify ทันที
                 if (socket.connected) {
                     socket.emit('identify', myUser);
@@ -1084,15 +1102,15 @@
         Chart.defaults.borderColor = 'rgba(42,51,82,.5)';
         const lineChart = new Chart(document.getElementById('lineChart'), {
             type: 'line', data: { labels: [], datasets: [{ label: 'Packets/sec', data: [], borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,.1)', fill: true, tension: .4, pointRadius: 2 }] },
-            options: { animation: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
+            options: { animation: false, plugins: { legend: { display: false } }, scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
         });
         const pieChart = new Chart(document.getElementById('pieChart'), {
-            type: 'doughnut', data: { labels: ['Encrypted', 'Plaintext'], datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
+            type: 'doughnut', data: { labels: ['Encrypted 0%', 'Plaintext 0%'], datasets: [{ data: [0, 0], backgroundColor: ['#10b981', '#ef4444'], borderWidth: 0 }] },
             options: { plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 8 } } } }
         });
         const barChart = new Chart(document.getElementById('barChart'), {
             type: 'bar', data: { labels: ['TCP', 'UDP', 'DNS', 'HTTP', 'HTTPS', 'QUIC'], datasets: [{ label: 'Count', data: [0, 0, 0, 0, 0, 0], backgroundColor: ['#6366f1', '#f59e0b', '#22d3ee', '#fb923c', '#10b981', '#a855f7'], borderRadius: 4 }] },
-            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
+            options: { plugins: { legend: { display: false } }, scales: { y: { min: 0, suggestedMax: 500, beginAtZero: true, ticks: { precision: 0 }, grid: { color: 'rgba(42,51,82,.3)' } }, x: { grid: { display: false } } } }
         });
 
         function getProtoIndex(p) {
@@ -1162,7 +1180,7 @@
             data._time = new Date().toLocaleTimeString();
             data._ts = Date.now();
             data._user = data._user || 'network';
-            packetHistory.push(data);
+            packetHistory.unshift(data);
 
             // Stats (อัพเดทเสมอ)
             totalPkts++;
@@ -1177,6 +1195,10 @@
             document.getElementById('statPlain').textContent = plainCount;
 
             // Pie
+            let tp = encCount + plainCount;
+            let ep = tp ? Math.round((encCount / tp) * 100) : 0;
+            let pp = tp ? Math.round((plainCount / tp) * 100) : 0;
+            pieChart.data.labels = [`Encrypted ${ep}%`, `Plaintext ${pp}%`];
             pieChart.data.datasets[0].data = [encCount, plainCount];
             pieChart.update('none');
 
@@ -1205,7 +1227,7 @@
             const tbody = document.getElementById('packetTableBody');
             const row = tbody.insertRow(0);
             row.onclick = () => showDetail(data);
-            const tlsV = data.tls_version || 'N/A';
+            const tlsVer = data.protocol.includes('UDP') ? '-' : (data.tls_version || 'N/A');
             const cipher = data.cipher && data.cipher !== 'N/A' ? data.cipher : '-';
             const hasAlert = data.alerts && data.alerts.length > 0;
             if (hasAlert) row.style.background = 'rgba(239, 68, 68, 0.15)';
@@ -1219,7 +1241,7 @@
         <td style="color:var(--accent)">${data.port || '-'}</td>
         <td>${data.size}B</td>
         <td><span class="badge-proto ${isEnc ? 'badge-enc' : 'badge-plain'}">${isEnc ? '🔒 Encrypted' : '⚠ Plain'}</span></td>
-        <td style="color:var(--accent2)">${tlsV}</td>
+        <td style="color:var(--accent2)">${tlsVer}</td>
         <td style="font-size:11px">${cipher}</td>
     `;
             if (tbody.rows.length > 200) tbody.deleteRow(200);
@@ -1303,7 +1325,7 @@
             );
             document.getElementById('historyCount').textContent = filtered.length + ' records';
 
-            const slice = filtered.slice(-500).reverse();
+            const slice = filtered.slice(0, 500);
             // const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
@@ -1312,17 +1334,17 @@
                 const hasAlert = d.alerts && d.alerts.length > 0;
                 if (hasAlert) row.style.background = 'rgba(239, 68, 68, 0.15)';
                 const alertIcon = hasAlert ? '<span title="Security Alert" style="cursor:help">🚨</span> ' : '';
-
+                const displayTime = d._time ? d._time : (d.created_at ? new Date(d.created_at).toLocaleTimeString() : '—');
                 row.innerHTML = `
             <td style="color:var(--text-secondary)">${filtered.length - i}</td>
-            <td>${d._time || '—'}</td>
+            <td style="color:var(--text-secondary)">${displayTime}</td>
             <td><span style="color:var(--accent);font-size:11px">${d._user || d.username || '—'}</span></td>
             <td><span class="badge-proto ${getProtoBadge(d.protocol)}">${alertIcon}${d.protocol}</span></td>
             <td>${d.src}</td><td>${d.dst}</td>
             <td style="color:var(--accent)">${d.port || '-'}</td>
             <td>${d.size}B</td>
             <td><span class="badge-proto ${isEnc ? 'badge-enc' : 'badge-plain'}">${isEnc ? 'Encrypted' : 'Plain'}</span></td>
-            <td style="color:var(--accent2)">${d.tls_version || '-'}</td>
+            <td style="color:var(--accent2)">${d.protocol.includes('UDP') ? '-' : (d.tls_version || '-')}</td>
             <td style="font-size:11px">${d.cipher && d.cipher !== 'N/A' ? d.cipher : '-'}</td>
             <td style="font-size:11px">${d.cert && d.cert !== 'N/A' ? d.cert : '-'}</td>
         `;
@@ -1331,7 +1353,7 @@
         document.getElementById('historySearch').addEventListener('input', renderHistory);
         document.getElementById('historyUserFilter').addEventListener('change', renderHistory);
         function clearHistory() {
-            if (confirm('ท่านแอดมินแน่ใจนะว่าจะล้างประวัติของ "ทุกคน" ทั้งเซิร์ฟเวอร์? หายเกลี้ยงเลยนะเว้ย!')) {
+            if (confirm('คุณต้องการลบประวัติของทุกคนใน server เลยไหม การกระทำนี้ไม่สามารถย้อนกลับได้')) {
 
                 axios.delete(`${url}/api/packets/all`)
                     .then(res => {
@@ -1349,6 +1371,7 @@
                         document.getElementById('statIPs').textContent = 0;
 
                         pieChart.data.datasets[0].data = [0, 0];
+                        pieChart.data.labels = ['Encrypted 0%', 'Plaintext 0%'];
                         pieChart.update('none');
                     })
                     .catch(err => console.error("❌ ลบประวัติไม่สำเร็จ!", err));
@@ -1376,13 +1399,13 @@
                 <td><span class="${isOnline ? 'dot-online' : 'dot-offline'}"></span>${isOnline ? 'Online' : 'Offline'}</td>
                 <td><span style="color:${isAdmin ? 'var(--accent)' : 'var(--text-primary)'};font-weight:${isAdmin ? 600 : 400}">${isAdmin ? '👑 ' : ''}${u.username}</span></td>
                 <td>
-                    <select class="user-role-select" onchange="changeRole('${u.username}',this.value)">
+                    <select class="user-role-select" onchange="changeRole('${u.users_id}',this.value)">
                         <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
                         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>
                 </td>
                 <td style="color:var(--text-secondary);font-size:12px">${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</td>
-                <td>${!isAdmin ? `<button class="btn-danger" onclick="deleteUser('${u.username}')">🗑 Delete</button>` : '<span style="color:var(--text-secondary);font-size:11px;">Protected</span>'}</td>
+                <td>${!isAdmin ? `<button class="btn-danger" onclick="deleteUser('${u.users_id}')">🗑 Delete</button>` : '<span style="color:var(--text-secondary);font-size:11px;">Protected</span>'}</td>
             `;
                 });
             } catch (e) { console.error('Load users failed:', e); }
@@ -1441,23 +1464,16 @@
 
         socket.on('new_alert', (alert) => {
             allAlerts.unshift(alert);
-            if (!alert.acknowledged) unackedCount++;
             updateAlertStats();
             showToast(alert);
             if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
         });
 
-        socket.on('alert_acknowledged', (alertId) => {
-            const a = allAlerts.find(x => x.id === alertId);
-            if (a && !a.acknowledged) { a.acknowledged = true; unackedCount = Math.max(0, unackedCount - 1); }
-            updateAlertStats();
-            if (document.getElementById('tab-alerts').classList.contains('active')) renderAlerts();
-        });
+
 
         // Fetch existing alerts on connect
         socket.on('alert_history', (alerts) => {
             allAlerts = alerts;
-            unackedCount = alerts.filter(a => !a.acknowledged).length;
             updateAlertStats();
             renderAlerts();
         });
@@ -1468,31 +1484,22 @@
             const crit = allAlerts.filter(a => a.severity === 'CRITICAL').length;
             const high = allAlerts.filter(a => a.severity === 'HIGH').length;
             const med = allAlerts.filter(a => a.severity === 'MEDIUM').length;
-            const acked = allAlerts.filter(a => a.acknowledged).length;
             document.getElementById('alertStatTotal').textContent = total;
             document.getElementById('alertStatCrit').textContent = crit;
             document.getElementById('alertStatHigh').textContent = high;
             document.getElementById('alertStatMed').textContent = med;
-            document.getElementById('alertStatAck').textContent = acked;
-            // Tab badge for unacked alerts
-            const badge = document.getElementById('alertTabBadge');
-            if (unackedCount > 0) {
-                badge.textContent = unackedCount > 99 ? '99+' : unackedCount;
-                badge.classList.remove('d-none');
-            } else {
-                badge.classList.add('d-none');
-            }
         }
 
         function renderAlerts() {
             const sevFilter = document.getElementById('alertFilterSeverity').value;
             const typeFilter = document.getElementById('alertFilterType').value;
-            const ackFilter = document.getElementById('alertFilterAck').value;
-            let filtered = allAlerts;
-            if (sevFilter) filtered = filtered.filter(a => a.severity === sevFilter);
-            if (typeFilter) filtered = filtered.filter(a => a.type === typeFilter);
-            if (ackFilter === 'unacked') filtered = filtered.filter(a => !a.acknowledged);
-            if (ackFilter === 'acked') filtered = filtered.filter(a => a.acknowledged);
+            let filtered = allAlerts; //รวมทั้งเซิฟ ละเด้วมาแยกอัน
+            if (sevFilter) {
+                filtered = filtered.filter(a => a.severity === sevFilter);
+            }
+            if (typeFilter) {
+                filtered = filtered.filter(a => a.type === typeFilter);
+            }
 
             document.getElementById('alertCount').textContent = filtered.length + ' alerts';
             const tbody = document.getElementById('alertsTableBody');
@@ -1500,7 +1507,6 @@
 
             filtered.forEach(a => {
                 const row = tbody.insertRow();
-                if (a.acknowledged) row.style.opacity = '0.45';
                 const det = a.details || {};
                 const detStr = Object.entries(det).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join(' | ');
                 row.innerHTML = `
@@ -1510,20 +1516,11 @@
             <td style="font-size:12px">${a.message}</td>
             <td style="font-size:11px;color:var(--accent2)">${det.src || '—'}</td>
             <td style="font-size:10px;color:var(--text-secondary);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${detStr}">${detStr}</td>
-            <td>${a.acknowledged
-                        ? '<span style="color:var(--success);font-size:11px;">✓ Acked</span>'
-                        : `<button class="btn-outline" style="padding:3px 10px;font-size:11px;" onclick="ackAlert('${a.id}')">Ack</button>`
-                    }</td>
         `;
             });
         }
 
-        function ackAlert(id) {
-            socket.emit('acknowledge_alert', id);
-        }
-        function ackAllAlerts() {
-            allAlerts.filter(a => !a.acknowledged).forEach(a => socket.emit('acknowledge_alert', a.id));
-        }
+
         function clearAlerts() {
             if (!confirm('Clear all alerts?')) return;
             allAlerts = [];
@@ -1545,7 +1542,7 @@
             });
         }
 
-        // Toast notifications
+        // การแจ้งเตือน
         let toastQueue = [];
         let toastShowing = false;
         function showToast(alert) {
@@ -1553,7 +1550,9 @@
             if (!toastShowing) processToastQueue();
         }
         function processToastQueue() {
-            if (!toastQueue.length) { toastShowing = false; return; }
+            if (!toastQueue.length) { 
+                toastShowing = false; return 
+            }
             toastShowing = true;
             const a = toastQueue.shift();
             const toast = document.createElement('div');
@@ -1573,10 +1572,7 @@
             }, 5000);
         }
 
-        // Also add 'alerts' to switchTab
         const _origSwitchTab = switchTab;
-        // Patch switchTab to handle alerts tab
-        // (replace the existing switchTab function entirely:)
         function switchTab(name) {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
