@@ -1035,7 +1035,7 @@
                 const res = await axios.get(`${url}/auth/me`);
                 if (res.data.user.role !== 'admin') { window.location.href = 'user.html'; return; }
                 document.getElementById('adminUsername').textContent = res.data.user.username;
-                myUser = { username: res.data.user.username, role: 'admin' };
+                myUser = { users_id: res.data.user.users_id, username: res.data.user.username, role: 'admin' };
                 // ถ้า socket connected แล้ว → ส่ง identify ทันที
                 if (socket.connected) {
                     socket.emit('identify', myUser);
@@ -1230,7 +1230,7 @@
         <td style="color:var(--accent)">${data.port || '-'}</td>
         <td>${data.size}B</td>
         <td><span class="badge-proto ${isEnc ? 'badge-enc' : 'badge-plain'}">${isEnc ? '🔒 Encrypted' : '⚠ Plain'}</span></td>
-        <td style="color:var(--accent2)">${tlsV}</td>
+        <td style="color:var(--accent2)">${tlsVer}</td>
         <td style="font-size:11px">${cipher}</td>
     `;
             if (tbody.rows.length > 200) tbody.deleteRow(200);
@@ -1387,13 +1387,13 @@
                 <td><span class="${isOnline ? 'dot-online' : 'dot-offline'}"></span>${isOnline ? 'Online' : 'Offline'}</td>
                 <td><span style="color:${isAdmin ? 'var(--accent)' : 'var(--text-primary)'};font-weight:${isAdmin ? 600 : 400}">${isAdmin ? '👑 ' : ''}${u.username}</span></td>
                 <td>
-                    <select class="user-role-select" onchange="changeRole('${u.username}',this.value)">
+                    <select class="user-role-select" onchange="changeRole('${u.users_id}',this.value)">
                         <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
                         <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
                     </select>
                 </td>
                 <td style="color:var(--text-secondary);font-size:12px">${u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}</td>
-                <td>${!isAdmin ? `<button class="btn-danger" onclick="deleteUser('${u.username}')">🗑 Delete</button>` : '<span style="color:var(--text-secondary);font-size:11px;">Protected</span>'}</td>
+                <td>${!isAdmin ? `<button class="btn-danger" onclick="deleteUser('${u.users_id}')">🗑 Delete</button>` : '<span style="color:var(--text-secondary);font-size:11px;">Protected</span>'}</td>
             `;
                 });
             } catch (e) { console.error('Load users failed:', e); }

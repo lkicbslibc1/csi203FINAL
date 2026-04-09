@@ -951,8 +951,9 @@
             try {
                 const res = await axios.get(`${url}/auth/me`);
                 const user = res.data.user;
+                console.log("ข้อมูล User ที่ได้จาก /auth/me:", user);
                 document.getElementById('userDisplay').textContent = user.username + ' (User)';
-                myUser = { username: user.username, role: user.role };
+                myUser = { users_id: user.users_id || user.id, username: user.username, role: user.role };
                 if (socket.connected) socket.emit('identify', myUser);
             } catch (err) { window.location.href = 'login.html'; }
         }
@@ -1154,8 +1155,8 @@
             // Render table (last 500, newest first)
             const tbody = document.getElementById('historyTableBody');
             tbody.innerHTML = '';
-            const slice = filtered.slice(-500).reverse();
-            // const slice = filtered.reverse();
+            // const slice = filtered.slice(-500).reverse();
+            const slice = filtered.reverse();
             slice.forEach((d, i) => {
                 const row = tbody.insertRow();
                 row.onclick = () => showDetail(d);

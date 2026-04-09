@@ -36,7 +36,7 @@ authorization.post("/login", async (req, res) => {
     }
 
     const token = jwt.sign(
-        { username: user.username, role: user.role },
+        { users_id: user.users_id, username: user.username, role: user.role },
         SECRET_KEY,
         { expiresIn: '1h' }
     );
@@ -60,6 +60,7 @@ authorization.get("/me", verifyToken, async (req, res) => {
     res.status(200).json({
         success: true,
         user: {
+            users_id: req.user.users_id,
             username: req.user.username,
             role: req.user.role
         }
