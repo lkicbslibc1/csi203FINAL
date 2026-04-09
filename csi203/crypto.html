@@ -3,19 +3,133 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Client Encryption</title>
+    <title>Client Encryption Simulator</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="crypto.css">
 </head>
 <body>
-    <h2>Encryption Demo</h2>
-    <input type="text" id="message" placeholder="Enter message">
-    <button onclick="sendEncrypted()">Send Encrypted</button>
-    <p><strong>Decrypted Response:</strong> <span id="response"></span></p>
+    
+        <!-- Navbar -->
+    <div class="admin-nav">
+        <div class="brand">🛡️ Packet<span>Dukjub</span> <span
+                style="color:var(--text-secondary);font-size:13px;font-weight:400;">Admin Console</span></div>
+        <div class="nav-right">
+            <a href="admin.html" target="_blank" class="btn-outline" style="padding:6px 14px;font-size:12px;margin-right:10px;text-decoration:none;"><i class="fas fa-microscope"></i>Dashboard</a>
+            <button class="btn-outline" onclick="logout()" style="padding:6px 14px;font-size:12px;">Logout</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        
+        <div class="header">
+            <h2>AES-256 Simulator</h2>
+        </div>
+
+        <!-- <div class="crypto-info">
+            <div class="info-row">
+                <span class="info-label">Encryption Key</span>
+                <span class="info-value" id="ui-secret-key">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Init Vector (IV)</span>
+                <span class="info-value" id="ui-iv">Loading...</span>
+            </div>
+        </div> -->
+        <div class="tab-container">
+            <button class="tab-trigger active" onclick="switchMode('encrypt')">Encrypt</button>
+            <button class="tab-trigger" onclick="switchMode('decrypt')">Decrypt</button>
+        </div>
+
+        <!-- Encrypt Mode -->
+        <div id="encrypt-mode" class="mode-content active">
+            <div class="input-group">
+                <input type="text" id="message" placeholder="Type a message to encrypt..." autocomplete="off">
+            </div>
+            <button id="encrypt-btn" onclick="sendEncrypted()">Encrypt & Send to Server</button>
+        </div>
+
+        <!-- Decrypt Mode -->
+        <div id="decrypt-mode" class="mode-content">
+            <div class="input-group">
+                <input type="text" id="encrypted-input-field" placeholder="Paste encrypted payload (Base64)..." autocomplete="off">
+            </div>
+            <button id="decrypt-btn" onclick="doLocalDecrypt()">Decrypt Locally</button>
+        </div>
+
+        <div class="result-box" id="result-box">
+            <!-- Encryption Result Section -->
+            <div id="encrypt-results">
+                <div class="result-section">
+                    <span class="result-title">Encrypted Payload To Send</span>
+                    <div class="result-content code-style" id="encrypted-output">Awaiting encryption...</div>
+                </div>
+                
+                <!-- <div class="result-divider"></div>
+                
+                <div class="result-section">
+                    <span class="result-title">Decrypted Response From Server</span>
+                    <div class="result-content" id="response"></div>
+                </div> -->
+            </div>
+
+            <!-- Decryption Result Section -->
+            <div id="decrypt-results" style="display: none;">
+                <div class="result-section">
+                    <span class="result-title">Decrypted Original Message</span>
+                    <div class="result-content" id="local-decrypted-output" style="color: #fbbf24; font-weight: 600;">Awaiting decryption...</div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         // ต้องตรงกับฝั่ง Server
         const SECRET_KEY = "ABCDEFGHIJKLMNOPQRSTUVWXYZ123456"; 
         const IV = "ABCDEF0123456789"; 
+
+        // แสดงผลคีย์บนหน้าเว็บ
+        document.getElementById("ui-secret-key").innerText = SECRET_KEY;
+        document.getElementById("ui-iv").innerText = IV;
+
+        // Tab Switching Logic
+        function switchMode(mode) {
+            document.querySelectorAll('.tab-trigger').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.mode-content').forEach(content => content.classList.remove('active'));
+            
+            if (mode === 'encrypt') {
+                document.querySelector('button[onclick*="encrypt"]').classList.add('active');
+                document.getElementById('encrypt-mode').classList.add('active');
+                document.getElementById('encrypt-results').style.display = 'block';
+                document.getElementById('decrypt-results').style.display = 'none';
+            } else {
+                document.querySelector('button[onclick*="decrypt"]').classList.add('active');
+                document.getElementById('decrypt-mode').classList.add('active');
+                document.getElementById('encrypt-results').style.display = 'none';
+                document.getElementById('decrypt-results').style.display = 'block';
+            }
+            
+            // Focus input
+            setTimeout(() => {
+                if (mode === 'encrypt') document.getElementById('message').focus();
+                else document.getElementById('encrypted-input-field').focus();
+            }, 50);
+        }
+
+        // กด Enter ในช่องข้อความ
+        document.getElementById("message").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                sendEncrypted();
+            }
+        });
+
+        document.getElementById("encrypted-input-field").addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                doLocalDecrypt();
+            }
+        });
 
         function encryptData(data) {
             let key = CryptoJS.enc.Utf8.parse(SECRET_KEY);
@@ -28,10 +142,79 @@
             return encrypted.toString();
         }
 
+        function decryptData(encryptedBase64) {
+            try {
+                let key = CryptoJS.enc.Utf8.parse(SECRET_KEY);
+                let iv = CryptoJS.enc.Utf8.parse(IV);
+                let decrypted = CryptoJS.AES.decrypt(encryptedBase64, key, {
+                    iv: iv,
+                    mode: CryptoJS.mode.CBC,
+                    padding: CryptoJS.pad.Pkcs7
+                });
+                return decrypted.toString(CryptoJS.enc.Utf8);
+            } catch (e) {
+                console.error("Decryption error:", e);
+                return null;
+            }
+        }
+
+        function doLocalDecrypt() {
+            let inputField = document.getElementById("encrypted-input-field");
+            let encryptedData = inputField.value;
+            
+            if (!encryptedData.trim()) {
+                inputField.focus();
+                return;
+            }
+
+            let resultBox = document.getElementById("result-box");
+            let outputEl = document.getElementById("local-decrypted-output");
+            
+            resultBox.style.display = "block";
+            outputEl.innerText = "Processing...";
+            outputEl.className = "result-content";
+
+            setTimeout(() => {
+                let decrypted = decryptData(encryptedData);
+                if (decrypted) {
+                    outputEl.innerText = decrypted;
+                    outputEl.style.color = "#fbbf24";
+                } else {
+                    outputEl.innerText = "Decryption failed. Invalid payload or key/IV mismatch.";
+                    outputEl.className = "result-content error";
+                }
+            }, 300);
+        }
+
         function sendEncrypted() {
-            let message = document.getElementById("message").value;
+            let messageInput = document.getElementById("message");
+            let message = messageInput.value;
+            
+            if (!message.trim()) {
+                messageInput.focus();
+                return;
+            }
+
+            let btn = document.getElementById("encrypt-btn");
+            let originalText = btn.innerText;
+            btn.innerText = "Processing...";
+            btn.style.opacity = "0.7";
+            btn.disabled = true;
+
+            let resultBox = document.getElementById("result-box");
+            let responseEl = document.getElementById("response");
+            let encryptedOutEl = document.getElementById("encrypted-output");
+            
+            resultBox.style.display = "block";
+            
             let encryptedData = encryptData(message);
             console.log(`encryptedData = ${encryptedData}`);
+            
+            // แสดงผลโค้ดที่ถูกเข้ารหัส
+            encryptedOutEl.innerText = encryptedData;
+            
+            responseEl.className = "result-content loading";
+            responseEl.innerText = "Sending encrypted packet to server...";
 
             fetch('/decrypt', {
                 method: 'POST',
@@ -40,9 +223,21 @@
             })
             .then(response => response.json())
             .then(data => {
-                document.getElementById("response").innerText = data.decryptedText;
+                responseEl.className = "result-content";
+                responseEl.innerText = data.decryptedText || "No readable text returned.";
             })
-            .catch(error => console.error("Error: ", error));
+            .catch(error => {
+                console.error("Error: ", error);
+                responseEl.className = "result-content error";
+                responseEl.innerText = "Network error. Server might be down.";
+            })
+            .finally(() => {
+                btn.innerText = originalText;
+                btn.style.opacity = "1";
+                btn.disabled = false;
+                messageInput.value = "";
+                messageInput.focus();
+            });
         }
     </script>
 </body>
