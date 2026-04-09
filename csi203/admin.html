@@ -56,8 +56,24 @@
             backdrop-filter: blur(20px);
             box-shadow: 0 0 30px rgba(250, 204, 21, 0.4), inset 0 -2px 10px rgba(250, 204, 21, 0.2);
         }
-        @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
-        canvas { filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.5)); }
+
+        @keyframes gradientMove {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        canvas {
+            filter: drop-shadow(0 0 8px rgba(250, 204, 21, 0.5));
+        }
 
         .admin-nav .brand {
             font-size: 20px;
@@ -224,12 +240,15 @@
             vertical-align: middle;
         }
 
-        .table-dark-custom tr { transition: all 0.2s ease; }
+        .table-dark-custom tr {
+            transition: all 0.2s ease;
+        }
+
         .table-dark-custom tr:hover td {
             background: rgba(250, 204, 21, .1) !important;
             box-shadow: inset 0 0 15px rgba(250, 204, 21, 0.2);
             cursor: pointer;
-            text-shadow: 0 0 5px rgba(255,255,255,0.5);
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
         }
 
         .table-scroll {
@@ -1197,7 +1216,7 @@
             const tbody = document.getElementById('packetTableBody');
             const row = tbody.insertRow(0);
             row.onclick = () => showDetail(data);
-            const tlsV = data.tls_version || 'N/A';
+            const tlsVer = data.protocol.includes('UDP') ? '-' : (data.tls_version || 'N/A');
             const cipher = data.cipher && data.cipher !== 'N/A' ? data.cipher : '-';
             const hasAlert = data.alerts && data.alerts.length > 0;
             if (hasAlert) row.style.background = 'rgba(239, 68, 68, 0.15)';
@@ -1314,7 +1333,7 @@
             <td style="color:var(--accent)">${d.port || '-'}</td>
             <td>${d.size}B</td>
             <td><span class="badge-proto ${isEnc ? 'badge-enc' : 'badge-plain'}">${isEnc ? 'Encrypted' : 'Plain'}</span></td>
-            <td style="color:var(--accent2)">${d.tls_version || '-'}</td>
+            <td style="color:var(--accent2)">${d.protocol.includes('UDP') ? '-' : (d.tls_version || '-')}</td>
             <td style="font-size:11px">${d.cipher && d.cipher !== 'N/A' ? d.cipher : '-'}</td>
             <td style="font-size:11px">${d.cert && d.cert !== 'N/A' ? d.cert : '-'}</td>
         `;
